@@ -3,15 +3,45 @@
 namespace QuickLog.Loggers;
 
 /// <summary>
-/// A logger that only triggers log events without writing to a file or console. 
-/// This logger is useful when you want to capture logs through event handlers.
+/// A logger that writes log entries to a file, ensuring thread safety for multiple logging instances.
 /// </summary>
-public class EventOnlyLogger : IQuickLog
+public class FileLogger : IQuickLog
 {
+    private static readonly object _fileLock = new();
+    private static StreamWriter? _logWriter;
+    private static string? _filePath;
+
     /// <summary>
     /// Occurs when a log event is triggered.
     /// </summary>
     public event EventHandler<LogEventArgs>? LogEvent;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FileLogger"/> class, specifying the file path for logging.
+    /// </summary>
+    /// <param name="filePath">The file path where log entries will be written.</param>
+    public FileLogger(string filePath) => SetLogFilePath(filePath);
+
+    /// <summary>
+    /// Sets the log file path and ensures the file and directory are ready for logging.
+    /// </summary>
+    /// <param name="filePath">The file path where log entries will be written.</param>
+    private void SetLogFilePath(string filePath)
+    {
+        if (_logWriter == null)
+        {
+            lock (_fileLock)
+            {
+                if (_logWriter == null) // Double-check locking
+                {
+                    CreateDirectoryIfNotExists(filePath);
+                    CheckFileWritePermissions(filePath);
+                    _filePath = filePath;
+                    _logWriter = new StreamWriter(_filePath, true) { AutoFlush = true };
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Logs a message with the specified log type and caller information.
@@ -66,12 +96,59 @@ public class EventOnlyLogger : IQuickLog
     }
 
     /// <summary>
-    /// Handles the logging process by invoking the log event with the specified log event arguments.
+    /// Handles the logging process by invoking the log event and writing the log message to the log file.
     /// </summary>
     /// <param name="logEventArgs">The log event arguments containing the log details.</param>
     private void HandleLog(LogEventArgs logEventArgs)
     {
         // Trigger the log event for any listeners
         LogEvent?.Invoke(this, logEventArgs);
+
+        // Write to file in a thread-safe manner
+        lock (_fileLock) _logWriter?.WriteLine(logEventArgs.ToString());
+    }
+
+    /// <summary>
+    /// Ensures that the directory for the log file exists, and if not, creates it.
+    /// </summary>
+    /// <param name="filePath">The path of the log file.</param>
+    private void CreateDirectoryIfNotExists(string filePath)
+    {
+        var directory = Path.GetDirectoryName(filePath);
+
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) Directory.CreateDirectory(directory);
+    }
+
+    /// <summary>
+    /// Checks if the application has write permissions for the specified file.
+    /// </summary>
+    /// <param name="filePath">The path of the log file to check.</param>
+    private void CheckFileWritePermissions(string filePath)
+    {
+        if (File.Exists(filePath))
+        {
+            try
+            {
+                using var fs = File.Open(filePath, FileMode.Append, FileAccess.Write);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                throw new UnauthorizedAccessException($"The application does not have permission to write to the file: {filePath}");
+            }
+        }
+        else
+        {
+            var directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(directory)) CreateDirectoryIfNotExists(filePath);
+        }
+    }
+
+    /// <summary>
+    /// Cleans up resources by closing the log file when the logger is disposed.
+    /// </summary>
+    ~FileLogger()
+    {
+        _logWriter?.Close();
+        _logWriter?.Dispose();
     }
 }
