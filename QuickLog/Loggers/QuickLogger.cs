@@ -9,6 +9,11 @@ namespace QuickLog.Loggers;
 public class QuickLogger : IQuickLog
 {
     /// <summary>
+    /// The path of the log-files - used only internally!
+    /// </summary>
+    internal string LogPath { get; }
+
+    /// <summary>
     /// Enables or disables logging to the console.
     /// </summary>
     public bool EnableConsoleLogging { get; set; }
@@ -52,6 +57,8 @@ public class QuickLogger : IQuickLog
         _consoleLogger = new ConsoleQuickLogger();
         _traceLogger = new TraceLogger();
         _fileLogger = logFilePath != null ? new FileLogger(logFilePath) : null;
+        if (logFilePath != null)
+            LogPath = Path.GetDirectoryName(logFilePath) ?? "logs";
 
         // Relay log events to QuickLogger's event
         _eventLogger.LogEvent += RelayLogEvent;

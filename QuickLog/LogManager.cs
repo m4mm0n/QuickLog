@@ -13,6 +13,7 @@ namespace QuickLog
         private static readonly ConcurrentDictionary<string, IQuickLog> _loggers = new();
         private static bool _configured = false;
         private static QuickLogger? _defaultLogger;
+        private static string _logPath = "logs";
 
         /// <summary>
         /// Gets or creates a logger by name. 
@@ -84,15 +85,27 @@ namespace QuickLog
         /// <returns>A new instance of <see cref="IQuickLog"/> with default logging settings (console, event, and trace enabled).</returns>
         private static IQuickLog CreateLogger(string name)
         {
-            var logger = new QuickLogger
+            // Check if a custom logger configuration is required for the name.
+            if (_configured && _defaultLogger != null)
+            {
+                // For example, create a logger that logs to a specific file based on the name
+                return new QuickLogger($"{_defaultLogger.LogPath}/{name}.log")
+                {
+                    EnableConsoleLogging = _defaultLogger.EnableConsoleLogging,
+                    EnableFileLogging = _defaultLogger.EnableFileLogging,
+                    EnableEventLogging = _defaultLogger.EnableEventLogging,
+                    EnableTraceLogging = _defaultLogger.EnableTraceLogging
+                };
+            }
+
+            // Fallback: create a new logger with generic default settings
+            return new QuickLogger
             {
                 EnableConsoleLogging = true,
                 EnableFileLogging = false,
                 EnableEventLogging = true,
                 EnableTraceLogging = true
             };
-
-            return logger;
         }
 
         /// <summary>
