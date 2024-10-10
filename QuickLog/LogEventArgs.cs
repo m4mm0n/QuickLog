@@ -38,6 +38,16 @@ namespace QuickLog
         public int CallerLineNumber { get; }
 
         /// <summary>
+        /// Gets the time-stamp format used for each log-entry.
+        /// </summary>
+        public string Timestamp { get; }
+
+        /// <summary>
+        /// Gets or sets the time-stamp format to use for each log-entry.
+        /// </summary>
+        public static string TimestampFormat { get; set; } = "yyyy-MM-dd HH:mm:ss";
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="LogEventArgs"/> class using the log type, message, and caller information.
         /// </summary>
         /// <param name="logType">The type of log.</param>
@@ -76,6 +86,7 @@ namespace QuickLog
             CallerName = callerName;
             CallerFilePath = callerFilePath;
             CallerLineNumber = callerLineNumber;
+            Timestamp = DateTime.Now.ToString(TimestampFormat);
         }
 
         /// <summary>
@@ -84,7 +95,7 @@ namespace QuickLog
         /// <returns>A string representing the log event.</returns>
         public override string ToString()
         {
-            var sb = $"[{LoggingType.GetDescription()}] [{CallerName}] [{CallerFilePath}:{CallerLineNumber}]";
+            var sb = $"[{Timestamp}] [{LoggingType.GetDescription()}] [{CallerName}] [{CallerFilePath}:{CallerLineNumber}]";
             if (Message != null)
                 sb += $"{Environment.NewLine}{Message}";
             if (Exception != null)
