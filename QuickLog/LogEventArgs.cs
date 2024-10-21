@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics;
+using System.Text;
+using QuickLog.Utilities;
 
 namespace QuickLog
 {
@@ -101,6 +103,20 @@ namespace QuickLog
             if (Exception != null)
                 sb += $"{Environment.NewLine}{Exception.ToStringDemystified()}";
             return sb;
+        }
+        /// <summary>
+        /// Returns the complete CRC32 hash-code of the entire entry of the LogEvent
+        /// </summary>
+        /// <returns>A CRC32 checksum</returns>
+        public override int GetHashCode()
+        {
+            using var c = new Crc32();
+            return (int)(c.CalculateChecksum(Encoding.UTF32.GetBytes(Message ?? "No Message Here")) +
+                         c.CalculateChecksum(Encoding.UTF32.GetBytes(Exception != null ? Exception.ToStringDemystified() : "No Exception Here")) +
+                         c.CalculateChecksum(Encoding.UTF32.GetBytes(LoggingType.GetDescription())) +
+                         c.CalculateChecksum(Encoding.UTF32.GetBytes(CallerName)) +
+                         c.CalculateChecksum(Encoding.UTF32.GetBytes(CallerFilePath)) +
+                         c.CalculateChecksum(Encoding.UTF32.GetBytes(Timestamp)));
         }
     }
 }
