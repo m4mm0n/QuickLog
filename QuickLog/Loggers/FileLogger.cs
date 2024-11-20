@@ -28,14 +28,15 @@ public class FileLogger : IQuickLog
     /// <param name="filePath">The file path where log entries will be written.</param>
     private void SetLogFilePath(string filePath)
     {
+        filePath = filePath.ReplaceInvalidChars();
         if (_logWriter == null)
         {
             lock (_fileLock)
             {
                 if (_logWriter == null) // Double-check locking
                 {
-                    CreateDirectoryIfNotExists(filePath);
-                    CheckFileWritePermissions(filePath);
+                    CreateDirectoryIfNotExists($"{Environment.CurrentDirectory}\\{filePath}");
+                    CheckFileWritePermissions($"{Environment.CurrentDirectory}\\{filePath}");
                     _filePath = filePath;
                     _logWriter = new StreamWriter(_filePath, true) { AutoFlush = true };
                 }
@@ -114,6 +115,7 @@ public class FileLogger : IQuickLog
     /// <param name="filePath">The path of the log file.</param>
     private void CreateDirectoryIfNotExists(string filePath)
     {
+        filePath = filePath.ReplaceInvalidChars();
         var directory = Path.GetDirectoryName(filePath);
 
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) Directory.CreateDirectory(directory);
@@ -125,6 +127,7 @@ public class FileLogger : IQuickLog
     /// <param name="filePath">The path of the log file to check.</param>
     private void CheckFileWritePermissions(string filePath)
     {
+        filePath = filePath.ReplaceInvalidChars();
         if (File.Exists(filePath))
         {
             try

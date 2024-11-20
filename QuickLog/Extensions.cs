@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System.Text.RegularExpressions;
 
 namespace QuickLog;
 
@@ -14,5 +15,13 @@ internal static class Extensions
         }
 
         return "";
+    }
+
+    public static string ReplaceInvalidChars(this string filename)
+    {
+        var invalidChars = Regex.Escape(new string(Path.GetInvalidFileNameChars()) + new string(Path.GetInvalidPathChars()));
+        var regexSearch = new string(Path.GetInvalidFileNameChars()) + new string(Path.GetInvalidPathChars());
+        var r = new Regex($"[{Regex.Escape(regexSearch)}]");
+        return r.Replace(filename, "");
     }
 }
