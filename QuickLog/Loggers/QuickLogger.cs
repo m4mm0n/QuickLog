@@ -6,12 +6,12 @@ namespace QuickLog.Loggers;
 /// <summary>
 /// A multi-purpose logger that can log to various destinations such as Console, File, Event, and Trace.
 /// </summary>
-public class QuickLogger : IQuickLog
+public class QuickLogger : IQuickLog, ICloneable
 {
     /// <summary>
     /// The path of the log-files - used only internally!
     /// </summary>
-    internal string LogPath { get; }
+    internal string LogPath { get; private set; }
 
     /// <summary>
     /// Enables or disables logging to the console.
@@ -35,10 +35,10 @@ public class QuickLogger : IQuickLog
 
     #region Internal Loggers
 
-    private readonly EventOnlyLogger? _eventLogger;
-    private readonly ConsoleQuickLogger? _consoleLogger;
-    private readonly FileLogger? _fileLogger;
-    private readonly TraceLogger? _traceLogger;
+    private EventOnlyLogger? _eventLogger;
+    private ConsoleQuickLogger? _consoleLogger;
+    private FileLogger? _fileLogger;
+    private TraceLogger? _traceLogger;
 
     #endregion
 
@@ -65,10 +65,12 @@ public class QuickLogger : IQuickLog
         _consoleLogger.LogEvent += RelayLogEvent;
         _traceLogger.LogEvent += RelayLogEvent;
 
-        if (_fileLogger != null)
-        {
-            _fileLogger.LogEvent += RelayLogEvent;
-        }
+        if (_fileLogger != null) _fileLogger.LogEvent += RelayLogEvent;
+    }
+
+    private QuickLogger()
+    {
+        //empty constructor for cloning
     }
 
     /// <summary>
@@ -174,5 +176,44 @@ public class QuickLogger : IQuickLog
             var message = $"Exiting method: {method.DeclaringType?.Name}.{method.Name}. Execution time: {stopwatch.ElapsedMilliseconds} ms.";
             Log(LogType.Trace, message, callerName, callerFilePath, callerLineNumber);
         }
+    }
+
+    /// <summary>
+    /// Clones the current instance of the <see cref="QuickLogger"/> class.
+    /// </summary>
+    /// <returns>A 1:1 clone of the current <see cref="QuickLogger"/></returns>
+    public object Clone()
+    {
+        var x = new QuickLogger
+        {
+            EnableConsoleLogging = EnableConsoleLogging,
+            EnableFileLogging = EnableFileLogging,
+            EnableEventLogging = EnableEventLogging,
+            EnableTraceLogging = EnableTraceLogging,
+            LogPath = LogPath
+        };
+        x.LogEvent = LogEvent;
+        x._consoleLogger = _consoleLogger;
+        x._eventLogger = _eventLogger;
+        x._fileLogger = _fileLogger;
+        x._traceLogger = _traceLogger;
+        return x;
+    }
+
+    /// <summary>
+    /// Clones the current instance of the <see cref="QuickLogger"/> class, and optionally changes the log file path.
+    /// </summary>
+    /// <param name="fileName">The file path for logging. If null, file logging is disabled if not already set originally by current instance.</param>
+    /// <returns>A 1:1 clone of the current <see cref="QuickLogger"/></returns>
+    public QuickLogger CloneDeep(string? fileName = null)
+    {
+        var x = (QuickLogger)Clone();
+        if (fileName != null && !fileName.EndsWith(x.LogPath.ToLower()))
+        {
+            _fileLogger = new FileLogger(fileName);
+            x.LogPath = Path.GetDirectoryName(fileName) ?? "logs";
+        }
+
+        return x;
     }
 }
