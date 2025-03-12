@@ -108,7 +108,11 @@ public class FileLogger : IQuickLog
         LogEvent?.Invoke(this, logEventArgs);
 
         // Write to file in a thread-safe manner
-        lock (_fileLock) _logWriter?.WriteLine(logEventArgs.ToString());
+        lock (_fileLock)
+        {
+            _logWriter?.WriteLine(logEventArgs.ToString());
+            _logWriter?.Flush();
+        }
     }
 
     /// <summary>

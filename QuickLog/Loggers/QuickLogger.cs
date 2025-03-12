@@ -48,10 +48,14 @@ public class QuickLogger : IQuickLog, ICloneable
     public event EventHandler<LogEventArgs>? LogEvent;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="QuickLogger"/> class with an optional file path for file logging.
+    /// Initializes a new instance of the <see cref="QuickLogger"/> class with the specified log file path and logging options.
     /// </summary>
-    /// <param name="logFilePath">The file path for logging. If null, file logging is disabled.</param>
-    public QuickLogger(string? logFilePath = null)
+    /// <param name="logFilePath">The file path for logging. If null, file logging is automatically disabled.</param>
+    /// <param name="eventLogging">Optional if Event Logging is wanted.</param>
+    /// <param name="consoleLogging">Optional if user wants logging to be written to console.</param>
+    /// <param name="fileLogging">Optional if user wants logging to be written to a log-file.</param>
+    /// <param name="traceLogging">Optional if Trace Logging is wanted.</param>
+    public QuickLogger(string? logFilePath = null, bool eventLogging = false, bool consoleLogging = false, bool fileLogging = false, bool traceLogging = false)
     {
         _eventLogger = new EventOnlyLogger();
         _consoleLogger = new ConsoleQuickLogger();
@@ -66,6 +70,11 @@ public class QuickLogger : IQuickLog, ICloneable
         _traceLogger.LogEvent += RelayLogEvent;
 
         if (_fileLogger != null) _fileLogger.LogEvent += RelayLogEvent;
+
+        EnableConsoleLogging = consoleLogging;
+        EnableFileLogging = fileLogging;
+        EnableEventLogging = eventLogging;
+        EnableTraceLogging = traceLogging;
     }
 
     private QuickLogger()
