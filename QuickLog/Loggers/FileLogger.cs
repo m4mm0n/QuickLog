@@ -129,7 +129,7 @@ public class FileLogger : IQuickLog
     /// <param name="filePath">The path of the log file to check.</param>
     private void CheckFileWritePermissions(string filePath)
     {
-        filePath = filePath.ReplaceInvalidChars();
+        filePath = filePath.ReplaceInvalidPathChars();
         if (File.Exists(filePath))
         {
             try
