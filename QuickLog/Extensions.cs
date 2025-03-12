@@ -24,4 +24,16 @@ internal static class Extensions
         var r = new Regex($"[{Regex.Escape(regexSearch)}]");
         return r.Replace(filename, "");
     }
+
+    public static string ReplaceInvalidPathChars(this string path)
+    {
+        // Get invalid characters for paths
+        var invalidChars = Path.GetInvalidPathChars();
+
+        // Create regex to match invalid characters
+        var regex = new Regex($"[{Regex.Escape(new string(invalidChars))}]");
+
+        return regex.Replace(path, "");
+    }
+
 }
