@@ -13,20 +13,33 @@ namespace QuickLog
         private static readonly ConcurrentDictionary<string, IQuickLog> _loggers = new();
         private static bool _configured = false;
         private static QuickLogger? _defaultLogger;
-        private static string _logPath = "logs";
 
         /// <summary>
         /// Gets or creates a logger by name. 
         /// If a logger with the specified name does not exist, it will be created with default settings.
         /// </summary>
         /// <param name="name">The unique name of the logger. This can be used to identify loggers in different parts of the application.</param>
+        /// <param name="useLogFile">If <see langword="true"/>, the logger will log to a file with the same name as the logger.</param>
         /// <returns>An instance of <see cref="IQuickLog"/> that corresponds to the specified name.</returns>
-        public static IQuickLog GetLogger(string name)
+        public static IQuickLog GetLogger(string name, bool useLogFile = false)
         {
-            if (!_configured) ConfigureDefault();
+            if (!_configured)
+                if(useLogFile)
+                    ConfigureDefault(name);
+                else
+                    ConfigureDefault();
 
             return _loggers.GetOrAdd(name, key => CreateLogger(name));
         }
+
+        /// <summary>
+        /// Gets or creates a logger by type.
+        /// If a logger with the specified type does not exist, it will be created with default settings.
+        /// </summary>
+        /// <param name="type">The Type to create a logger for.</param>
+        /// <param name="useLogFile">If <see langword="true"/>, the logger will log to a file with the same name as the logger.</param>
+        /// <returns>An instance of <see cref="IQuickLog"/> that corresponds to the specified type</returns>
+        public static IQuickLog GetLogger(Type type, bool useLogFile = false) => GetLogger(type.EnsureNotNull().FullName!, useLogFile);
 
         /// <summary>
         /// Configures the default logger used by the application. 
@@ -36,14 +49,37 @@ namespace QuickLog
         /// If null, a new default logger with console logging enabled is created.</param>
         public static void ConfigureDefault(QuickLogger? defaultLogger = null)
         {
-            _defaultLogger = defaultLogger ?? new QuickLogger
-            {
-                EnableConsoleLogging = true,
-                EnableFileLogging = false,
-                EnableEventLogging = false,
-                EnableTraceLogging = false
-            };
+            _defaultLogger = defaultLogger != null
+                ? (QuickLogger)defaultLogger.Clone()
+                : new QuickLogger
+                {
+                    EnableConsoleLogging = true,
+                    EnableFileLogging = false,
+                    EnableEventLogging = false,
+                    EnableTraceLogging = false
+                };
 
+            _configured = true;
+        }
+
+        /// <summary>
+        /// Configures the default logger used by the application to log to a specific file.
+        /// If no logger has been configured, the default logger is returned by the <see cref="GetDefaultLogger"/> method.
+        /// </summary>
+        /// <param name="fileName">The filename of the log-file</param>
+        /// <param name="defaultLogger">An optional instance of <see cref="QuickLogger"/> to be used as the default logger.
+        /// If null, a new default logger with console logging enabled is created.</param>
+        public static void ConfigureDefault(string fileName, QuickLogger? defaultLogger = null)
+        {
+            _defaultLogger = defaultLogger != null
+                ? defaultLogger.CloneDeep(fileName)
+                : new QuickLogger(fileName)
+                {
+                    EnableConsoleLogging = true,
+                    EnableFileLogging = true,
+                    EnableEventLogging = false,
+                    EnableTraceLogging = false
+                };
             _configured = true;
         }
 
