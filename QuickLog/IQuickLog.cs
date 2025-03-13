@@ -5,7 +5,7 @@ namespace QuickLog;
 /// <summary>
 /// Interface for QuickLog's various adoptions
 /// </summary>
-public interface IQuickLog
+public interface IQuickLog : IDisposable
 {
     /// <summary>
     /// Event handler for the logging events.

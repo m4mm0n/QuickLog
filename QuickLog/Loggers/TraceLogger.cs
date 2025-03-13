@@ -117,4 +117,11 @@ public class TraceLogger : IQuickLog
         // Output the trace log (e.g., to debug output)
         Trace.WriteLine(logEventArgs.ToString());
     }
+    /// <summary>
+    /// Disposes of the logger and releases any resources used.
+    /// </summary>
+    public void Dispose()
+    {
+        LogEvent = null;
+    }
 }

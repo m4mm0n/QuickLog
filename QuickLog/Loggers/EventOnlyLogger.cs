@@ -74,4 +74,11 @@ public class EventOnlyLogger : IQuickLog
         // Trigger the log event for any listeners
         LogEvent?.Invoke(this, logEventArgs);
     }
+    /// <summary>
+    /// Disposes the logger by setting the log event to null.
+    /// </summary>
+    public void Dispose()
+    {
+        LogEvent = null;
+    }
 }

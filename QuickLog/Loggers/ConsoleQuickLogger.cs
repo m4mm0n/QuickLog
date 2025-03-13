@@ -80,4 +80,11 @@ public class ConsoleQuickLogger : IQuickLog
         // Write to the console
         Console.WriteLine(logEventArgs.ToString());
     }
+    /// <summary>
+    /// Disposes of the ConsoleQuickLogger instance.
+    /// </summary>
+    public void Dispose()
+    {
+        // Nothing to dispose
+    }
 }

@@ -225,4 +225,25 @@ public class QuickLogger : IQuickLog, ICloneable
 
         return x;
     }
+    /// <summary>
+    /// Disposes of the internal loggers.
+    /// </summary>
+    ~QuickLogger()
+    {
+        _eventLogger?.Dispose();
+        _consoleLogger?.Dispose();
+        _fileLogger?.Dispose();
+        _traceLogger?.Dispose();
+    }
+    /// <summary>
+    /// Disposes of the internal loggers.
+    /// </summary>
+    public void Dispose()
+    {
+        _eventLogger?.Dispose();
+        _consoleLogger?.Dispose();
+        _fileLogger?.Dispose();
+        _traceLogger?.Dispose();
+        GC.SuppressFinalize(this);
+    }
 }

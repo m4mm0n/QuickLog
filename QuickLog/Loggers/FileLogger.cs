@@ -157,7 +157,18 @@ public class FileLogger : IQuickLog
     /// </summary>
     ~FileLogger()
     {
-        _logWriter?.Close();
-        _logWriter?.Dispose();
+        Dispose(false);
+    }
+    private void Dispose(bool disposing)
+    {
+        if (disposing) _logWriter?.Dispose();
+    }
+    /// <summary>
+    /// Disposes of the resources used by the logger.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }
