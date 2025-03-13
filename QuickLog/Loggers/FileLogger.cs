@@ -7,9 +7,9 @@ namespace QuickLog.Loggers;
 /// </summary>
 public class FileLogger : IQuickLog
 {
-    private static readonly object _fileLock = new();
-    private static StreamWriter? _logWriter;
-    private static string? _filePath;
+    private readonly object _fileLock = new();
+    private StreamWriter? _logWriter;
+    private string? _filePath;
 
     /// <summary>
     /// Occurs when a log event is triggered.
