@@ -120,6 +120,43 @@ var fileLogger = new FileQuickLogger("logs/app.log");
 fileLogger.Log(LogType.Error, "An error occurred.");
 ```
 
+
+
+### 8. Godot Logging
+
+The `GodotFileLogger` integrates seamlessly with **Godot 4+** projects written in C#.  
+It automatically detects if it is running inside a Godot runtime using `IsGodotRuntime()`.  
+
+- If **Godot is not present**, the logger falls back gracefully to a safe local folder and does not require the Godot assemblies at build time.  
+- If **Godot is present**, log files are written to the standard Godot `user://` path (the game’s writable directory).  
+
+```csharp
+// Create a Godot logger (logs will go to user://logs/game.log inside Godot)
+var godotLogger = new GodotFileLogger("game.log");
+
+// Example usage
+godotLogger.Log(LogType.Info, "Game started successfully.");
+godotLogger.Log(LogType.Error, new Exception("Something went wrong inside Godot."));
+```
+
+### LogManager Support for Godot
+
+You can configure and retrieve a default Godot logger via `LogManager` helpers:
+
+```csharp
+// Configure default logger for Godot (writes to user://logs/game.log)
+LogManager.ConfigureDefaultGodotLogger("game.log");
+
+// Retrieve default Godot logger
+var godotLogger = LogManager.GetDefaultLogger();
+
+// Log with it
+godotLogger.Log(LogType.Debug, "Debug log from inside Godot.");
+```
+
+This allows **plug-and-play logging** for Godot projects while keeping QuickLogger compatible with plain .NET projects.
+
+
 ## LogManager Features
 
 The `LogManager` simplifies the management of loggers across your application:

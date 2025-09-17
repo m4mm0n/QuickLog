@@ -1,4 +1,5 @@
 ﻿using QuickLog.Loggers;
+using QuickLog.Utilities;
 using System.Collections.Concurrent;
 
 namespace QuickLog
@@ -142,6 +143,88 @@ namespace QuickLog
                 EnableEventLogging = true,
                 EnableTraceLogging = true
             };
+        }
+
+        /// <summary>
+        /// Configures the default logger to write its file output into Godot's <c>user://</c> directory
+        /// when the Godot runtime is present, or into a standard local folder otherwise.
+        /// <para>
+        /// No compile-time dependency on Godot is required. Resolution of <c>user://</c> is done at runtime
+        /// via reflection; if it fails, a safe fallback directory is used.
+        /// </para>
+        /// </summary>
+        /// <param name="fileName">
+        /// Log file name only (e.g. <c>application.log</c>). Invalid characters are sanitized.
+        /// </param>
+        /// <param name="subfolder">
+        /// Optional subfolder under the base directory (default: <c>"logs"</c>). Use <c>""</c> for the root.
+        /// </param>
+        /// <param name="fallbackRoot">
+        /// Optional custom fallback when not in Godot. If <see langword="null"/>, defaults to a platform-specific
+        /// local app-data folder (e.g. <c>%LOCALAPPDATA%\GodotUser</c>).
+        /// </param>
+        public static void ConfigureDefaultGodotLogger(
+            string fileName = "application.log",
+            string subfolder = "logs",
+            string? fallbackRoot = null)
+        {
+            fileName = fileName.ReplaceInvalidChars(); // uses your Extensions helper
+
+            var baseDir = GodotUserPathResolver.GetUserDir(fallbackRoot);
+            var targetDir = string.IsNullOrWhiteSpace(subfolder) ? baseDir : Path.Combine(baseDir, subfolder);
+            Directory.CreateDirectory(targetDir);
+
+            var fullPath = Path.Combine(targetDir, fileName);
+
+            // Create a QuickLogger that writes to the resolved path.
+            _defaultLogger = new Loggers.QuickLogger(fullPath)
+            {
+                EnableConsoleLogging = true,
+                EnableFileLogging = true,
+                EnableEventLogging = false,
+                EnableTraceLogging = false
+            };
+
+            _configured = true;
+        }
+
+        /// <summary>
+        /// Retrieves or creates a named logger whose file output is directed to Godot's <c>user://</c> directory
+        /// when available (or a safe fallback otherwise). The logger is cached under <paramref name="name"/> just like
+        /// <see cref="GetLogger(string, bool)"/>, but its file path is resolved using the Godot-aware logic.
+        /// </summary>
+        /// <param name="name">Unique logical name for the logger (also used for the default file name if none is supplied).</param>
+        /// <param name="fileName">
+        /// Optional explicit file name (e.g. <c>"netcode.log"</c>). If <see langword="null"/>, uses <c>{name}.log</c>.
+        /// </param>
+        /// <param name="subfolder">Optional subfolder under the base directory (default: <c>"logs"</c>).</param>
+        /// <param name="fallbackRoot">Optional custom fallback root when not in Godot.</param>
+        /// <returns>An <see cref="IQuickLog"/> instance configured for Godot-style storage.</returns>
+        public static IQuickLog GetGodotLogger(
+            string name,
+            string? fileName = null,
+            string subfolder = "logs",
+            string? fallbackRoot = null)
+        {
+            if (!_configured) ConfigureDefault(); // ensure base config exists
+
+            return _loggers.GetOrAdd(name, _ =>
+            {
+                var baseDir = GodotUserPathResolver.GetUserDir(fallbackRoot);
+                var targetDir = string.IsNullOrWhiteSpace(subfolder) ? baseDir : Path.Combine(baseDir, subfolder);
+                Directory.CreateDirectory(targetDir);
+
+                var fn = (fileName ?? $"{name}.log").ReplaceInvalidChars();
+                var fullPath = Path.Combine(targetDir, fn);
+
+                return new Loggers.QuickLogger(fullPath)
+                {
+                    EnableConsoleLogging = _defaultLogger?.EnableConsoleLogging ?? true,
+                    EnableFileLogging = true, // force file logging for a “file” logger
+                    EnableEventLogging = _defaultLogger?.EnableEventLogging ?? false,
+                    EnableTraceLogging = _defaultLogger?.EnableTraceLogging ?? false
+                };
+            });
         }
 
         /// <summary>
