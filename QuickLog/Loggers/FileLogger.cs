@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using QuickLog.Utilities;
+using System.Runtime.CompilerServices;
 
 namespace QuickLog.Loggers;
 
@@ -32,9 +33,7 @@ public class FileLogger : IQuickLog
         var dirName = filePath.Replace(fileName, "");
 
         if (_logWriter == null)
-        {
             lock (_fileLock)
-            {
                 if (_logWriter == null) // Double-check locking
                 {
                     CreateDirectoryIfNotExists(dirName);
@@ -42,8 +41,6 @@ public class FileLogger : IQuickLog
                     _filePath = filePath;
                     _logWriter = new StreamWriter(_filePath, true) { AutoFlush = true };
                 }
-            }
-        }
     }
 
     /// <summary>
@@ -57,11 +54,8 @@ public class FileLogger : IQuickLog
     public void Log(LogType logType, string message,
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0)
-    {
-        var logEventArgs = new LogEventArgs(logType, message, callerName, callerFilePath, callerLineNumber);
-        HandleLog(logEventArgs);
-    }
+        [CallerLineNumber] int callerLineNumber = 0) =>
+        HandleLog(new LogEventArgs(logType, message, callerName, callerFilePath, callerLineNumber));
 
     /// <summary>
     /// Logs an exception with the specified log type and caller information.
@@ -74,11 +68,8 @@ public class FileLogger : IQuickLog
     public void Log(LogType logType, Exception exception,
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0)
-    {
-        var logEventArgs = new LogEventArgs(logType, exception, callerName, callerFilePath, callerLineNumber);
-        HandleLog(logEventArgs);
-    }
+        [CallerLineNumber] int callerLineNumber = 0) =>
+        HandleLog(new LogEventArgs(logType, exception, callerName, callerFilePath, callerLineNumber));
 
     /// <summary>
     /// Logs a message and an exception with the specified log type and caller information.
@@ -92,11 +83,8 @@ public class FileLogger : IQuickLog
     public void Log(LogType logType, string message, Exception exception,
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0)
-    {
-        var logEventArgs = new LogEventArgs(logType, message, exception, callerName, callerFilePath, callerLineNumber);
-        HandleLog(logEventArgs);
-    }
+        [CallerLineNumber] int callerLineNumber = 0) =>
+        HandleLog(new LogEventArgs(logType, message, exception, callerName, callerFilePath, callerLineNumber));
 
     /// <summary>
     /// Handles the logging process by invoking the log event and writing the log message to the log file.
@@ -122,9 +110,10 @@ public class FileLogger : IQuickLog
     private void CreateDirectoryIfNotExists(string filePath)
     {
         filePath = filePath.ReplaceInvalidPathChars();
-        var directory = Path.GetDirectoryName(filePath);
 
-        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) Directory.CreateDirectory(directory);
+        if (!string.IsNullOrEmpty(Path.GetDirectoryName(filePath)) &&
+            !Directory.Exists(Path.GetDirectoryName(filePath)))
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath));
     }
 
     /// <summary>
@@ -155,10 +144,8 @@ public class FileLogger : IQuickLog
     /// <summary>
     /// Cleans up resources by closing the log file when the logger is disposed.
     /// </summary>
-    ~FileLogger()
-    {
-        Dispose(false);
-    }
+    ~FileLogger() => Dispose(false);
+
     private void Dispose(bool disposing)
     {
         if (disposing) _logWriter?.Dispose();

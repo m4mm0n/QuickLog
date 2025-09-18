@@ -78,9 +78,7 @@ public class QuickLogger : IQuickLog, ICloneable
     }
 
     private QuickLogger()
-    {
-        //empty constructor for cloning
-    }
+    { }
 
     /// <summary>
     /// Relays log events from the internal loggers to the main logger event handler.
@@ -158,12 +156,10 @@ public class QuickLogger : IQuickLog, ICloneable
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
-        var method = new StackTrace().GetFrame(1)?.GetMethod();
-        if (method != null)
-        {
-            var message = $"Entering method: {method.DeclaringType?.Name}.{method.Name}";
-            Log(LogType.Trace, message, callerName, callerFilePath, callerLineNumber);
-        }
+        if (new StackTrace().GetFrame(1)?.GetMethod() != null)
+            Log(LogType.Trace,
+                $"Entering method: {new StackTrace().GetFrame(1)?.GetMethod().DeclaringType?.Name}.{new StackTrace().GetFrame(1)?.GetMethod().Name}",
+                callerName, callerFilePath, callerLineNumber);
     }
 
     /// <summary>
@@ -178,12 +174,12 @@ public class QuickLogger : IQuickLog, ICloneable
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
-        var method = new StackTrace().GetFrame(1)?.GetMethod();
-        if (method != null)
+        if (new StackTrace().GetFrame(1)?.GetMethod() != null)
         {
             stopwatch.Stop();
-            var message = $"Exiting method: {method.DeclaringType?.Name}.{method.Name}. Execution time: {stopwatch.ElapsedMilliseconds} ms.";
-            Log(LogType.Trace, message, callerName, callerFilePath, callerLineNumber);
+            Log(LogType.Trace,
+                $"Exiting method: {new StackTrace().GetFrame(1)?.GetMethod().DeclaringType?.Name}.{new StackTrace().GetFrame(1)?.GetMethod().Name}. Execution time: {stopwatch.ElapsedMilliseconds} ms.",
+                callerName, callerFilePath, callerLineNumber);
         }
     }
 

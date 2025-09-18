@@ -25,11 +25,8 @@ public class ConsoleQuickLogger : IQuickLog
     public void Log(LogType logType, string message,
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0)
-    {
-        var logEventArgs = new LogEventArgs(logType, message, callerName, callerFilePath, callerLineNumber);
-        HandleLog(logEventArgs);
-    }
+        [CallerLineNumber] int callerLineNumber = 0) =>
+        HandleLog(new LogEventArgs(logType, message, callerName, callerFilePath, callerLineNumber));
 
     /// <summary>
     /// Logs an exception with the specified log type and caller information.
@@ -43,11 +40,8 @@ public class ConsoleQuickLogger : IQuickLog
     public void Log(LogType logType, Exception exception,
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0)
-    {
-        var logEventArgs = new LogEventArgs(logType, exception, callerName, callerFilePath, callerLineNumber);
-        HandleLog(logEventArgs);
-    }
+        [CallerLineNumber] int callerLineNumber = 0) =>
+        HandleLog(new LogEventArgs(logType, exception, callerName, callerFilePath, callerLineNumber));
 
     /// <summary>
     /// Logs a message and an exception with the specified log type and caller information.
@@ -62,11 +56,8 @@ public class ConsoleQuickLogger : IQuickLog
     public void Log(LogType logType, string message, Exception exception,
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0)
-    {
-        var logEventArgs = new LogEventArgs(logType, message, exception, callerName, callerFilePath, callerLineNumber);
-        HandleLog(logEventArgs);
-    }
+        [CallerLineNumber] int callerLineNumber = 0) =>
+        HandleLog(new LogEventArgs(logType, message, exception, callerName, callerFilePath, callerLineNumber));
 
     /// <summary>
     /// Handles the logging process by invoking the log event and outputting the log message to the console.

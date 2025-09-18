@@ -24,11 +24,8 @@ public class TraceLogger : IQuickLog
     public void Log(LogType logType, string message,
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0)
-    {
-        var logEventArgs = new LogEventArgs(logType, message, callerName, callerFilePath, callerLineNumber);
-        HandleLog(logEventArgs);
-    }
+        [CallerLineNumber] int callerLineNumber = 0) =>
+        HandleLog(new LogEventArgs(logType, message, callerName, callerFilePath, callerLineNumber));
 
     /// <summary>
     /// Logs an exception with the specified log type and caller information.
@@ -41,11 +38,8 @@ public class TraceLogger : IQuickLog
     public void Log(LogType logType, Exception exception,
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0)
-    {
-        var logEventArgs = new LogEventArgs(logType, exception, callerName, callerFilePath, callerLineNumber);
-        HandleLog(logEventArgs);
-    }
+        [CallerLineNumber] int callerLineNumber = 0) =>
+        HandleLog(new LogEventArgs(logType, exception, callerName, callerFilePath, callerLineNumber));
 
     /// <summary>
     /// Logs a message and an exception with the specified log type and caller information.
@@ -59,11 +53,8 @@ public class TraceLogger : IQuickLog
     public void Log(LogType logType, string message, Exception exception,
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
-        [CallerLineNumber] int callerLineNumber = 0)
-    {
-        var logEventArgs = new LogEventArgs(logType, message, exception, callerName, callerFilePath, callerLineNumber);
-        HandleLog(logEventArgs);
-    }
+        [CallerLineNumber] int callerLineNumber = 0) =>
+        HandleLog(new LogEventArgs(logType, message, exception, callerName, callerFilePath, callerLineNumber));
 
     /// <summary>
     /// Logs the entry of a method, capturing caller information.
@@ -76,12 +67,11 @@ public class TraceLogger : IQuickLog
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
-        var method = new StackTrace().GetFrame(1)?.GetMethod();
-        if (method != null)
-        {
-            var message = $"Entering method: {method.DeclaringType?.Name}.{method.Name}";
-            Log(LogType.Trace, message, callerName, callerFilePath, callerLineNumber);
-        }
+        if (new StackTrace().GetFrame(1)?.GetMethod() != null)
+            Log(LogType.Trace,
+                $"Entering method: {new StackTrace().GetFrame(1)?.GetMethod().DeclaringType?.Name}.{new StackTrace().GetFrame(1)?.GetMethod().Name}",
+                callerName,
+                callerFilePath, callerLineNumber);
     }
 
     /// <summary>
@@ -96,12 +86,12 @@ public class TraceLogger : IQuickLog
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
-        var method = new StackTrace().GetFrame(1)?.GetMethod();
-        if (method != null)
+        if (new StackTrace().GetFrame(1)?.GetMethod() != null)
         {
             stopwatch.Stop();
-            var message = $"Exiting method: {method.DeclaringType?.Name}.{method.Name}. Execution time: {stopwatch.ElapsedMilliseconds} ms.";
-            Log(LogType.Trace, message, callerName, callerFilePath, callerLineNumber);
+            Log(LogType.Trace,
+                $"Exiting method: {new StackTrace().GetFrame(1)?.GetMethod().DeclaringType?.Name}.{new StackTrace().GetFrame(1)?.GetMethod().Name}. Execution time: {stopwatch.ElapsedMilliseconds} ms.",
+                callerName, callerFilePath, callerLineNumber);
         }
     }
 
@@ -120,8 +110,5 @@ public class TraceLogger : IQuickLog
     /// <summary>
     /// Disposes of the logger and releases any resources used.
     /// </summary>
-    public void Dispose()
-    {
-        LogEvent = null;
-    }
+    public void Dispose() => LogEvent = null;
 }
