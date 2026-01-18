@@ -1,16 +1,38 @@
-﻿namespace QuickLog.Utilities
+﻿/*
+ * ====================================================================================================
+ *  Project        : QuickLog
+ *  File           : Crc32.cs
+ *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
+ *  Created        : 2024-10-21 11:56:51 +02:00
+ *  Last Modified  : 2026-01-18 07:12:52 +01:00
+ *  CRC32          : 8C663E75
+ *  
+ *  Description    :
+ *                   A simple CRC32 class which supports calculating the CRC32 checksum of a file, byte array or stream
+ * 
+ *  License        :
+ *                   MIT
+ *                   https://opensource.org/licenses/MIT
+ *
+ *  Notes          :
+ *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
+ * ====================================================================================================
+ */
+// CRC32-BODY: 8C663E75
+
+namespace QuickLog.Utilities;
+
+/// <summary>
+/// A simple CRC32 class which supports calculating the CRC32 checksum of a file, byte array or stream
+/// </summary>
+public class Crc32 : IDisposable
 {
-    /// <summary>
-    /// A simple CRC32 class which supports calculating the CRC32 checksum of a file, byte array or stream
-    /// </summary>
-    public class Crc32 : IDisposable
+    #region Constants
+    const uint POLYNOMIAL = 0x04C11DB7;
+    const int WIDTH = 8 * sizeof(uint);
+    const uint TOPBIT = 1U << (WIDTH - 8);
+    private readonly uint[] _crc32Table =
     {
-        #region Constants
-        const uint POLYNOMIAL = 0x04C11DB7;
-        const int WIDTH = 8 * sizeof(uint);
-        const uint TOPBIT = 1U << (WIDTH - 8);
-        private readonly uint[] _crc32Table =
-        {
             0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3, 0x0EDB8832,
             0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91, 0x1DB71064, 0x6AB020F2,
             0xF3B97148, 0x84BE41DE, 0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7, 0x136C9856, 0x646BA8C0, 0xFD62F97A,
@@ -41,38 +63,37 @@
             0x24B4A3A6, 0xBAD03605, 0xCDD70693, 0x54DE5729, 0x23D967BF, 0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94,
             0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D
         };
-        #endregion
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Crc32"/> class.
-        /// </summary>
-        public Crc32() { }// => _crc32Table = GenerateCrc32Table();
-        /// <summary>
-        /// Calculates the CRC32 checksum of a byte array
-        /// </summary>
-        /// <param name="arrayToHash"></param>
-        /// <returns></returns>
-        public uint CalculateChecksum(byte[] arrayToHash) => CalculateChecksum(new MemoryStream(arrayToHash));
-        /// <summary>
-        /// Calculates the CRC32 checksum of a stream
-        /// </summary>
-        /// <param name="streamToHash"></param>
-        /// <param name="bufSize"></param>
-        /// <returns></returns>
-        public uint CalculateChecksum(Stream streamToHash, int bufSize = 4096)
-        {
-            var crc = 0xFFFFFFFF;
-            var buffer = new byte[bufSize];
-            int read;
+    #endregion
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Crc32"/> class.
+    /// </summary>
+    public Crc32() { }// => _crc32Table = GenerateCrc32Table();
+    /// <summary>
+    /// Calculates the CRC32 checksum of a byte array
+    /// </summary>
+    /// <param name="arrayToHash"></param>
+    /// <returns></returns>
+    public uint CalculateChecksum(byte[] arrayToHash) => CalculateChecksum(new MemoryStream(arrayToHash));
+    /// <summary>
+    /// Calculates the CRC32 checksum of a stream
+    /// </summary>
+    /// <param name="streamToHash"></param>
+    /// <param name="bufSize"></param>
+    /// <returns></returns>
+    public uint CalculateChecksum(Stream streamToHash, int bufSize = 4096)
+    {
+        var crc = 0xFFFFFFFF;
+        var buffer = new byte[bufSize];
+        int read;
 
-            while ((read = streamToHash.Read(buffer, 0, buffer.Length)) > 0)
-                for (var i = 0; i < read; i++)
-                    crc = (crc >> 8) ^ _crc32Table[(crc ^ buffer[i]) & 0xFF];
+        while ((read = streamToHash.Read(buffer, 0, buffer.Length)) > 0)
+            for (var i = 0; i < read; i++)
+                crc = (crc >> 8) ^ _crc32Table[(crc ^ buffer[i]) & 0xFF];
 
-            return ~crc;
-        }
+        return ~crc;
+    }
 
-        public void Dispose()
-        {
-        }
+    public void Dispose()
+    {
     }
 }
