@@ -22,6 +22,7 @@
 // CRC32-BODY: 23737EEC
 
 using QuickLog.Exceptions;
+using QuickLog.Godot;
 using QuickLog.Loggers;
 using QuickLog.Utilities;
 using System.Collections.Concurrent;
@@ -266,6 +267,7 @@ public static class LogManager
     /// behavior.</remarks>
     public static void Shutdown()
     {
+        GodotLogInterceptor.Detach();
         ExceptionHookManager.Detach();
 
         foreach (var logger in _loggers.Values)
@@ -313,4 +315,40 @@ public static class LogManager
     /// <see cref="AttachExceptionHooks(ExceptionHookOptions?)"/>.
     /// </summary>
     public static void DetachExceptionHooks() => ExceptionHookManager.Detach();
+
+    // -----------------------------------------------------------------------------------------
+    //  Godot integration convenience API
+    // -----------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Attaches the full Godot integration to the default logger:
+    /// engine log interception (<see cref="GodotLogInterceptor"/>), unhandled exception
+    /// ownership (<see cref="ExceptionHookManager"/>), and a native <c>OS.Alert()</c> popup.
+    /// <para>
+    /// Call once at the start of your Godot project's <c>_Ready()</c> or <c>Main()</c>.
+    /// </para>
+    /// </summary>
+    /// <param name="options">
+    /// Optional Godot-specific options. <see langword="null"/> uses sensible defaults
+    /// (all interception enabled, exception hijacking on, crash dump on, OS.Alert popup).
+    /// </param>
+    public static void AttachGodotHooks(GodotLogOptions? options = null)
+    {
+        if (!_configured) ConfigureDefault();
+        GodotLogInterceptor.Attach(_defaultLogger!, options);
+    }
+
+    /// <summary>
+    /// Attaches the full Godot integration to a specific <paramref name="logger"/>.
+    /// </summary>
+    /// <param name="logger">The logger that will receive all intercepted Godot output.</param>
+    /// <param name="options">Optional behaviour overrides.</param>
+    public static void AttachGodotHooks(IQuickLog logger, GodotLogOptions? options = null)
+        => GodotLogInterceptor.Attach(logger, options);
+
+    /// <summary>
+    /// Detaches all Godot integration hooks registered by
+    /// <see cref="AttachGodotHooks(GodotLogOptions?)"/>.
+    /// </summary>
+    public static void DetachGodotHooks() => GodotLogInterceptor.Detach();
 }
