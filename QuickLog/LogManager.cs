@@ -21,6 +21,7 @@
  */
 // CRC32-BODY: 23737EEC
 
+using QuickLog.Exceptions;
 using QuickLog.Loggers;
 using QuickLog.Utilities;
 using System.Collections.Concurrent;
@@ -258,12 +259,15 @@ public static class LogManager
 
     /// <summary>
     /// Releases all resources used by registered loggers and clears the logger registry.
+    /// Automatically detaches any active <see cref="ExceptionHookManager"/> hooks.
     /// </summary>
     /// <remarks>Call this method to dispose of all loggers managed by the logger registry. After calling this
     /// method, attempts to retrieve or use loggers from the registry may result in errors or undefined
     /// behavior.</remarks>
     public static void Shutdown()
     {
+        ExceptionHookManager.Detach();
+
         foreach (var logger in _loggers.Values)
         {
             if (logger is IDisposable d)
@@ -272,4 +276,41 @@ public static class LogManager
 
         _loggers.Clear();
     }
+
+    // -----------------------------------------------------------------------------------------
+    //  Exception hook convenience API
+    // -----------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Attaches <see cref="ExceptionHookManager"/> to the default logger so that every unhandled
+    /// exception is automatically logged and (by default) shown in a modal popup.
+    /// <para>
+    /// Call once at application startup, after <see cref="ConfigureDefault()"/> has been called
+    /// (or let this method auto-configure the default logger if needed).
+    /// </para>
+    /// </summary>
+    /// <param name="options">
+    /// Optional behaviour overrides. When <see langword="null"/> sensible defaults are used:
+    /// popup enabled, <see cref="LogType.Crit"/>, task exceptions not suppressed.
+    /// </param>
+    public static void AttachExceptionHooks(ExceptionHookOptions? options = null)
+    {
+        if (!_configured) ConfigureDefault();
+        ExceptionHookManager.Attach(_defaultLogger!, options);
+    }
+
+    /// <summary>
+    /// Attaches <see cref="ExceptionHookManager"/> to a specific <paramref name="logger"/>
+    /// rather than the default one.
+    /// </summary>
+    /// <param name="logger">Logger that will receive captured exceptions.</param>
+    /// <param name="options">Optional behaviour overrides.</param>
+    public static void AttachExceptionHooks(IQuickLog logger, ExceptionHookOptions? options = null)
+        => ExceptionHookManager.Attach(logger, options);
+
+    /// <summary>
+    /// Detaches the <see cref="ExceptionHookManager"/> hooks registered by
+    /// <see cref="AttachExceptionHooks(ExceptionHookOptions?)"/>.
+    /// </summary>
+    public static void DetachExceptionHooks() => ExceptionHookManager.Detach();
 }
