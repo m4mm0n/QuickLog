@@ -134,6 +134,24 @@ public class QuickLogger : IQuickLog, ICloneable
     public string? BinaryLogPath { get; set; }
 
     /// <summary>
+    /// Gets or sets the path for JSON Lines output (one JSON object per entry).
+    /// <see langword="null"/> disables the JSON sink.
+    /// </summary>
+    public string? JsonLogPath { get; set; }
+
+    /// <summary>Route async-dispatched entries to <see cref="System.Diagnostics.Trace"/>.</summary>
+    public bool EnableAsyncTraceLogging { get; set; }
+
+    /// <summary>Drop policy applied when the async queue is full.</summary>
+    public AsyncDropPolicy AsyncDropPolicy { get; set; } = AsyncDropPolicy.DropBelowLevel;
+
+    /// <summary>Entries below this level may be dropped under <see cref="AsyncDropPolicy.DropBelowLevel"/>.</summary>
+    public LogType AsyncMinimumLevel { get; set; } = LogType.Warn;
+
+    /// <summary>Thread role that is shielded from dropping under <see cref="AsyncDropPolicy.DropByThreadRole"/>.</summary>
+    public ThreadRole AsyncProtectedRole { get; set; } = ThreadRole.Audio;
+
+    /// <summary>
     /// Returns a snapshot of recent log entries captured by the async memory sink.
     /// Returns an empty list if async logging is disabled.
     /// </summary>
@@ -257,15 +275,21 @@ public class QuickLogger : IQuickLog, ICloneable
 
         // Optional async file sink (batched)
         if (EnableAsyncFileLogging && !string.IsNullOrWhiteSpace(LogPath))
-        {
-            var file = Path.Combine(LogPath, "quicklog.async.log");
-            _asyncSinks.Add(new FileSink(file, AsyncFileBatchSize));
-        }
+            _asyncSinks.Add(new FileSink(Path.Combine(LogPath, "quicklog.async.log"), AsyncFileBatchSize));
+
+        // Optional async trace sink
+        if (EnableAsyncTraceLogging)
+            _asyncSinks.Add(new TraceSink());
+
+        // Optional JSON Lines sink
+        if (!string.IsNullOrWhiteSpace(JsonLogPath))
+            _asyncSinks.Add(new JsonLinesSink(JsonLogPath));
 
         _asyncDispatcher = new AsyncLogDispatcher(_asyncSinks)
         {
-            DropPolicy = AsyncDropPolicy.DropByThreadRole,
-            ProtectedRole = ThreadRole.Audio
+            DropPolicy    = this.AsyncDropPolicy,
+            MinimumLevel  = AsyncMinimumLevel,
+            ProtectedRole = AsyncProtectedRole
         };
     }
 
