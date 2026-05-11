@@ -160,7 +160,18 @@ public static class ExceptionHookManager
         if (args.SuppressDefaultHandling)
             return;
 
-        // 3. Log the exception.
+        // 3. Attempt non-fatal recovery (unobserved tasks only).
+        if (source == ExceptionSource.UnobservedTask && opts.Restart?.RecoveryAction != null)
+        {
+            try
+            {
+                if (opts.Restart.RecoveryAction(exception))
+                    return; // recovered — skip log, dump, popup
+            }
+            catch { /* recovery delegate must not abort the pipeline */ }
+        }
+
+        // 4. Log the exception.
         if (logger != null)
         {
             try
@@ -176,20 +187,60 @@ public static class ExceptionHookManager
             catch { /* logging must never throw from within the exception handler */ }
         }
 
-        // 4. Show popup.
+        // 5. Write crash dump.
+        string? dumpPath = null;
+        if (opts.CrashDump is { Enabled: true })
+        {
+            try { dumpPath = CrashDumpWriter.Write(exception, source, isTerminating, opts.CrashDump); }
+            catch { /* dump errors must not abort the handler */ }
+        }
+
+        // 6. Show popup (include dump path when available).
         if (opts.ShowPopup)
         {
             try
             {
                 var popup = opts.CustomPopup ?? _defaultPopup;
-                var body = BuildPopupBody(exception, opts.ShowStackTraceInPopup, source, isTerminating);
+                var body = BuildPopupBody(exception, opts.ShowStackTraceInPopup, source, isTerminating, dumpPath);
                 popup.Show(opts.PopupTitle, body, exception, source);
             }
             catch { /* popup errors must not abort the handler */ }
         }
+
+        // 7. Auto-restart (fatal AppDomain exceptions only).
+        if (isTerminating && source == ExceptionSource.AppDomain && opts.Restart is { EnableAutoRestart: true })
+            TryRestart(opts.Restart);
     }
 
-    private static string BuildPopupBody(Exception exception, bool includeStack, ExceptionSource source, bool isTerminating)
+    private static void TryRestart(RestartOptions restart)
+    {
+        try
+        {
+            var currentCount = RestartOptions.CurrentRestartCount;
+            if (currentCount >= restart.MaxRestartCount)
+                return;
+
+            if (restart.DelayBeforeRestart > TimeSpan.Zero)
+                Thread.Sleep(restart.DelayBeforeRestart);
+
+            var exe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+            if (exe is null) return;
+
+            var originalArgs = Environment.GetCommandLineArgs().Skip(1); // skip exe name
+            var extraArgs    = restart.ExtraArguments ?? [];
+            var allArgs      = string.Join(" ", originalArgs.Concat(extraArgs).Select(a => $"\"{a}\""));
+
+            var psi = new System.Diagnostics.ProcessStartInfo(exe, allArgs)
+            {
+                UseShellExecute = false
+            };
+            psi.Environment[RestartOptions.RestartCountEnvVar] = (currentCount + 1).ToString();
+            System.Diagnostics.Process.Start(psi);
+        }
+        catch { /* restart failure must not itself crash the handler */ }
+    }
+
+    private static string BuildPopupBody(Exception exception, bool includeStack, ExceptionSource source, bool isTerminating, string? dumpPath)
     {
         var sb = new System.Text.StringBuilder();
 
@@ -204,6 +255,12 @@ public static class ExceptionHookManager
         sb.AppendLine();
         sb.Append("Type:    ").AppendLine(exception.GetType().FullName ?? exception.GetType().Name);
         sb.Append("Message: ").AppendLine(exception.Message);
+
+        if (dumpPath != null)
+        {
+            sb.AppendLine();
+            sb.Append("Crash dump: ").AppendLine(dumpPath);
+        }
 
         if (includeStack)
         {

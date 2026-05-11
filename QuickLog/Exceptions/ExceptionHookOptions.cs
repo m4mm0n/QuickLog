@@ -62,4 +62,16 @@ public sealed class ExceptionHookOptions
     /// Defaults to <see langword="true"/>.
     /// </summary>
     public bool ShowStackTraceInPopup { get; set; } = true;
+
+    /// <summary>
+    /// Crash-dump report settings. When <see langword="null"/> or
+    /// <see cref="CrashDumpOptions.Enabled"/> is <see langword="false"/>, no dump is written.
+    /// </summary>
+    public CrashDumpOptions? CrashDump { get; set; }
+
+    /// <summary>
+    /// Automatic restart / recovery settings. When <see langword="null"/> no restart or
+    /// recovery logic is applied.
+    /// </summary>
+    public RestartOptions? Restart { get; set; }
 }
