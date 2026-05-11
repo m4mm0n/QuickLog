@@ -4,6 +4,20 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <PackageVersion>2.0.0</PackageVersion>
+
+    <Product>QuickLog</Product>
+    <Company>ZeroLinez Softworx</Company>
+    <Authors>Geir Gustavsen</Authors>
+    <Copyright>Copyright © ZeroLinez Softworx 2024–2026</Copyright>
+    <Description>High-performance, engine-grade logging with exception ownership, crash dumps, auto-restart, and Godot integration. Zero external dependencies.</Description>
+    <PackageTags>logging;gamedev;godot;exceptions;crash-dump;async</PackageTags>
+    <RepositoryUrl>https://github.com/m4mm0n/QuickLog</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
 </Project>
