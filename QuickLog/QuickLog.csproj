@@ -20,7 +20,12 @@
     <PackageTags>logging;gamedev;godot;exceptions;crash-dump;async</PackageTags>
     <RepositoryUrl>https://github.com/m4mm0n/QuickLog</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
