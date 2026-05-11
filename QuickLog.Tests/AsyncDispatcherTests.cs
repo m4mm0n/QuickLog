@@ -1,0 +1,95 @@
+using QuickLog.Loggers;
+using Xunit;
+
+namespace QuickLog.Tests;
+
+public sealed class AsyncDispatcherTests
+{
+    [Fact]
+    public async Task AsyncLogging_EntriesReachMemorySink()
+    {
+        using var logger = new QuickLogger();
+        logger.EnableAsyncLogging = true;
+
+        for (var i = 0; i < 5; i++)
+            logger.Log(LogType.Info, $"entry {i}");
+
+        logger.Flush();
+        await WaitForLogsAsync(logger, expectedCount: 5);
+
+        Assert.Equal(5, logger.GetRecentLogs().Count);
+    }
+
+    [Fact]
+    public async Task AsyncOnly_NoSyncIO_EventStillFires()
+    {
+        using var logger = new QuickLogger();
+        logger.AsyncOnly = true;
+        logger.EnableAsyncLogging = true;
+        logger.RaiseLogEventInAsyncOnly = true;
+
+        var events = new List<LogEventArgs>();
+        logger.LogEvent += (_, e) => events.Add(e);
+
+        logger.Log(LogType.Warn, "async only test");
+        logger.Flush();
+        await WaitForLogsAsync(logger, expectedCount: 1);
+
+        Assert.Single(events);
+        Assert.Equal(LogType.Warn, events[0].LoggingType);
+    }
+
+    [Fact]
+    public async Task Filter_DropsEntriesBelowWarn_KeepsWarnAndAbove()
+    {
+        using var logger = new QuickLogger();
+        logger.EnableAsyncLogging = true;
+        logger.Filter = e => e.LoggingType >= LogType.Warn;
+
+        logger.Log(LogType.Info, "below threshold");
+        logger.Log(LogType.Error, "above threshold");
+
+        logger.Flush();
+        await WaitForLogsAsync(logger, expectedCount: 1);
+
+        var logs = logger.GetRecentLogs();
+        Assert.DoesNotContain(logs, e => e.Message == "below threshold");
+        Assert.Contains(logs, e => e.Message == "above threshold");
+    }
+
+    [Fact]
+    public async Task Shutdown_FlushesAllPendingEntries()
+    {
+        using var logger = new QuickLogger();
+        logger.EnableAsyncLogging = true;
+
+        for (var i = 0; i < 20; i++)
+            logger.Log(LogType.Debug, $"msg {i}");
+
+        logger.Shutdown();
+        await Task.Delay(50);
+
+        Assert.Equal(20, logger.GetRecentLogs().Count);
+    }
+
+    [Fact]
+    public void LogEvent_FiresOnSyncPath_WhenAsyncOnlyFalse()
+    {
+        using var logger = new QuickLogger(eventLogging: true);
+
+        var received = new List<LogEventArgs>();
+        logger.LogEvent += (_, e) => received.Add(e);
+
+        logger.Log(LogType.Info, "sync event test");
+
+        Assert.Single(received);
+        Assert.Equal("sync event test", received[0].Message);
+    }
+
+    private static async Task WaitForLogsAsync(QuickLogger logger, int expectedCount, int timeoutMs = 3000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (logger.GetRecentLogs().Count < expectedCount && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
+    }
+}

@@ -84,6 +84,7 @@ public static class BinaryLogReader
 
                 fs.Position = recordStart;
                 var raw = br.ReadBytes((int)(recordEnd - recordStart));
+                fs.Position = recordEnd + sizeof(uint); // advance past the CRC field
                 var calc = crc32.CalculateChecksum(raw);
 
                 if (calc != storedCrc)
