@@ -171,7 +171,7 @@ public static class ExceptionHookManager
                         : "[FATAL — unhandled]"
                     : "[UNOBSERVED TASK]";
 
-                logger.Log(opts.ExceptionLogType, $"{prefix} {exception.GetType().Name}: {exception.Message}", exception);
+                logger.Log(opts.ExceptionLogType, $"⚠ Your exception has been hijacked by QuickLog! {prefix} {exception.GetType().Name}: {exception.Message}", exception);
             }
             catch { /* logging must never throw from within the exception handler */ }
         }
@@ -193,6 +193,8 @@ public static class ExceptionHookManager
     {
         var sb = new System.Text.StringBuilder();
 
+        sb.AppendLine("⚠ Your exception has been hijacked by QuickLog!");
+        sb.AppendLine();
         sb.AppendLine(source == ExceptionSource.AppDomain
             ? isTerminating
                 ? "A fatal unhandled exception occurred. The application must terminate."
