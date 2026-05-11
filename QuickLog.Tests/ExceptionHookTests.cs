@@ -5,7 +5,7 @@ using Xunit;
 namespace QuickLog.Tests;
 
 // Tests share one process-wide static class — serialize them.
-[Collection("ExceptionHook")]
+[Collection("Sequential")]
 public sealed class ExceptionHookTests : IDisposable
 {
     private readonly MemoryQuickLogger _logger = new();
@@ -168,11 +168,12 @@ public sealed class ExceptionHookTests : IDisposable
 
     private static async Task DrainGC()
     {
-        for (var i = 0; i < 3; i++)
+        for (var i = 0; i < 5; i++)
         {
-            await Task.Delay(350);
-            GC.Collect();
+            await Task.Delay(400);
+            GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
             GC.WaitForPendingFinalizers();
+            GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
         }
     }
 }

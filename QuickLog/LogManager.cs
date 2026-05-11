@@ -110,6 +110,41 @@ public static class LogManager
     }
 
     /// <summary>
+    /// Configures the default logger using a <see cref="LoggerOptions"/> instance.
+    /// Recommended entry-point — covers all pipeline settings in one call and supports the
+    /// fluent <c>With*</c> builder pattern on <see cref="LoggerOptions"/>.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// LogManager.ConfigureDefault(
+    ///     new LoggerOptions()
+    ///         .WithFile("logs/app.log")
+    ///         .WithConsole()
+    ///         .WithAsync(AsyncDropPolicy.DropBelowLevel, LogType.Warn)
+    ///         .WithJsonLog("logs/app.jsonl"));
+    /// </code>
+    /// </example>
+    public static void ConfigureDefault(LoggerOptions options)
+    {
+        _defaultLogger = new QuickLogger(options.LogFilePath)
+        {
+            EnableConsoleLogging    = options.ConsoleLogging,
+            EnableFileLogging       = options.FileLogging && options.LogFilePath != null,
+            EnableEventLogging      = options.EventLogging,
+            EnableTraceLogging      = options.TraceLogging,
+            EnableAsyncLogging      = options.AsyncLogging,
+            AsyncOnly               = options.AsyncOnly,
+            AsyncDropPolicy         = options.AsyncDropPolicy,
+            AsyncMinimumLevel       = options.AsyncMinimumLevel,
+            AsyncProtectedRole      = options.AsyncProtectedRole,
+            JsonLogPath             = options.JsonLogPath,
+            EnableAsyncTraceLogging = options.AsyncTraceLogging,
+            Filter                  = options.Filter
+        };
+        _configured = true;
+    }
+
+    /// <summary>
     /// Configures the default logger to log to a specific file path.
     /// The logger will log both to the console and the specified file, making it suitable for general use.
     /// </summary>
@@ -277,6 +312,11 @@ public static class LogManager
         }
 
         _loggers.Clear();
+
+        if (_defaultLogger is IDisposable dl)
+            dl.Dispose();
+        _defaultLogger = null;
+        _configured = false;
     }
 
     // -----------------------------------------------------------------------------------------
