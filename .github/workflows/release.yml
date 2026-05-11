@@ -87,4 +87,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to NuGet.org
-        run: dotnet nuget push "nupkgs/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        shell: pwsh
+        run: |
+          $pkg = Get-ChildItem nupkgs/*.nupkg | Select-Object -First 1 -ExpandProperty FullName
+          dotnet nuget push $pkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
