@@ -1,5 +1,8 @@
 # QuickLog
 
+[![NuGet](https://img.shields.io/nuget/v/QuickLog.svg)](https://www.nuget.org/packages/QuickLog)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/QuickLog.svg)](https://www.nuget.org/packages/QuickLog)
+
 QuickLog is a **high-performance, engine-grade logging system** written in C#.
 It is designed for **deterministic behavior**, **low allocation**, and **post-mortem analysis**,
 making it especially suitable for **game engines, demo engines, tools, and services**.
