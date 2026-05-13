@@ -29,24 +29,7 @@ namespace QuickLog.Core;
 /// Each thread maintains its own independent scope stack. The class is static and cannot be instantiated.</remarks>
 internal static class LogScope
 {
-    [ThreadStatic]
-    private static Stack<string>? _stack;
+    public static IDisposable Push(string name) => QuickLog.LogScope.Begin(name);
 
-    public static IDisposable Push(string name)
-    {
-        _stack ??= new Stack<string>();
-        _stack.Push(name);
-        return new ScopeHandle();
-    }
-
-    public static string? Current =>
-        _stack is { Count: > 0 } ? _stack.Peek() : null;
-
-    private sealed class ScopeHandle : IDisposable
-    {
-        public void Dispose()
-        {
-            _stack?.Pop();
-        }
-    }
+    public static string? Current => QuickLog.LogScope.Current;
 }

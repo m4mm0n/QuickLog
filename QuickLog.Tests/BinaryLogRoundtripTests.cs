@@ -116,6 +116,23 @@ public sealed class BinaryLogRoundtripTests : IDisposable
         Assert.Equal("binary through logger", entry.Message);
     }
 
+    [Fact]
+    public void ContextFields_RoundtripThroughBinaryLog()
+    {
+        var entry = new LogEntry(
+            DateTime.UtcNow, LogType.Info, "context binary",
+            "L", "ScopeA", "M", "f.cs", 1, 1, ThreadRole.Unknown,
+            "corr-1", "trace-1", "span-1");
+
+        using (var sink = new BinaryLogSink(_path))
+            sink.Write(in entry);
+
+        var read = BinaryLogReader.Read(_path).Single();
+        Assert.Equal("corr-1", read.CorrelationId);
+        Assert.Equal("trace-1", read.TraceId);
+        Assert.Equal("span-1", read.SpanId);
+    }
+
     public void Dispose()
     {
         if (File.Exists(_path)) File.Delete(_path);

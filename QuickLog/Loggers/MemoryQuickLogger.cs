@@ -23,6 +23,7 @@
 
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using QuickLog.Core;
 
 namespace QuickLog.Loggers;
 
@@ -64,6 +65,21 @@ public sealed class MemoryQuickLogger : IQuickLog
             _entries.TryDequeue(out _);
 
         LogEvent?.Invoke(this, args);
+    }
+
+    internal void Log(in LogEntry entry)
+    {
+        Add(new LogEventArgs(
+            entry.Level,
+            entry.Message,
+            null,
+            entry.MemberName,
+            entry.FilePath,
+            entry.LineNumber,
+            entry.Category,
+            entry.CorrelationId,
+            entry.TraceId,
+            entry.SpanId));
     }
 
     // ------------------------------------------------------------------

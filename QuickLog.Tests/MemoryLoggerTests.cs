@@ -99,4 +99,23 @@ public sealed class MemoryLoggerTests
 
         Assert.Equal(2, fired);
     }
+
+    [Fact]
+    public void QuickLogger_RecentLogs_CarryScopeAndCorrelation()
+    {
+        using var logger = new QuickLogger();
+        logger.EnableAsyncLogging = true;
+
+        using (QuickLog.LogContext.BeginCorrelation("corr-memory"))
+        using (QuickLog.LogScope.Begin("Frame", 7))
+        {
+            logger.Log(LogType.Info, "memory context");
+        }
+
+        logger.Shutdown();
+
+        var entry = logger.GetRecentLogs().Single();
+        Assert.Equal("Frame:7", entry.Scope);
+        Assert.Equal("corr-memory", entry.CorrelationId);
+    }
 }

@@ -45,12 +45,7 @@ internal sealed class MemorySink : ILogSink
 
     public void Write(in LogEntry entry)
     {
-        _logger.Log(
-            entry.Level,
-            entry.Message,
-            entry.MemberName,
-            entry.FilePath,
-            entry.LineNumber);
+        _logger.Log(in entry);
     }
 
     public void Flush() { }

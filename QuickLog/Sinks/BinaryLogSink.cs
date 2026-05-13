@@ -43,7 +43,7 @@ internal sealed class BinaryLogSink : ILogSink
     private readonly Crc32 _crc = new();
 
     private static readonly byte[] Magic = "QLOG"u8.ToArray();
-    private const int Version = 1;
+    private const int Version = 2;
 
     public BinaryLogSink(string path)
     {
@@ -69,6 +69,9 @@ internal sealed class BinaryLogSink : ILogSink
         WriteString(bw, entry.FilePath);
         WriteString(bw, entry.Category);
         WriteString(bw, entry.Message);
+        WriteString(bw, entry.CorrelationId);
+        WriteString(bw, entry.TraceId);
+        WriteString(bw, entry.SpanId);
 
         bw.Flush();
 

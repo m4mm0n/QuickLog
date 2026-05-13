@@ -66,6 +66,26 @@ public class LogEventArgs : EventArgs
     public string Timestamp { get; }
 
     /// <summary>
+    /// Gets the logical scope active when the log entry was created.
+    /// </summary>
+    public string? Scope { get; }
+
+    /// <summary>
+    /// Gets the correlation identifier active when the log entry was created.
+    /// </summary>
+    public string? CorrelationId { get; }
+
+    /// <summary>
+    /// Gets the trace identifier active when the log entry was created.
+    /// </summary>
+    public string? TraceId { get; }
+
+    /// <summary>
+    /// Gets the span identifier active when the log entry was created.
+    /// </summary>
+    public string? SpanId { get; }
+
+    /// <summary>
     /// Gets or sets the time-stamp format to use for each log-entry.
     /// </summary>
     public static string TimestampFormat { get; set; } = "yyyy-MM-dd HH:mm:ss";
@@ -101,7 +121,21 @@ public class LogEventArgs : EventArgs
     /// <param name="callerName">The name of the method that initiated the log.</param>
     /// <param name="callerFilePath">The file path of the source code that initiated the log.</param>
     /// <param name="callerLineNumber">The line number in the source file where the log was initiated.</param>
-    public LogEventArgs(LogType logType, string? message, Exception? exception, string callerName, string callerFilePath, int callerLineNumber)
+    /// <param name="scope">The logical scope active when the entry was created.</param>
+    /// <param name="correlationId">The correlation identifier active when the entry was created.</param>
+    /// <param name="traceId">The trace identifier active when the entry was created.</param>
+    /// <param name="spanId">The span identifier active when the entry was created.</param>
+    public LogEventArgs(
+        LogType logType,
+        string? message,
+        Exception? exception,
+        string callerName,
+        string callerFilePath,
+        int callerLineNumber,
+        string? scope = null,
+        string? correlationId = null,
+        string? traceId = null,
+        string? spanId = null)
     {
         LoggingType = logType;
         Message = message;
@@ -110,6 +144,10 @@ public class LogEventArgs : EventArgs
         CallerFilePath = callerFilePath;
         CallerLineNumber = callerLineNumber;
         Timestamp = DateTime.Now.ToString(TimestampFormat);
+        Scope = scope;
+        CorrelationId = correlationId;
+        TraceId = traceId;
+        SpanId = spanId;
     }
 
     /// <summary>

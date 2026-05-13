@@ -65,7 +65,7 @@ public static class BinaryLogReader
                     yield break;
 
                 var version = br.ReadInt32();
-                if (version != 1)
+                if (version is not (1 or 2))
                     yield break;
 
                 var ticks = br.ReadInt64();
@@ -78,6 +78,9 @@ public static class BinaryLogReader
                 var file = ReadString(br);
                 var category = ReadString(br);
                 var message = ReadString(br);
+                var correlationId = version >= 2 ? ReadString(br) : null;
+                var traceId = version >= 2 ? ReadString(br) : null;
+                var spanId = version >= 2 ? ReadString(br) : null;
 
                 var recordEnd = fs.Position;
                 var storedCrc = br.ReadUInt32();
@@ -105,7 +108,10 @@ public static class BinaryLogReader
                     file,
                     lineNumber,
                     threadId,
-                    threadRole
+                    threadRole,
+                    string.IsNullOrEmpty(correlationId) ? null : correlationId,
+                    string.IsNullOrEmpty(traceId) ? null : traceId,
+                    string.IsNullOrEmpty(spanId) ? null : spanId
                 );
             }
             catch

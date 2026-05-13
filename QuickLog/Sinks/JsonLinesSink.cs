@@ -37,7 +37,10 @@ internal sealed class JsonLinesSink : ILogSink
             entry.LineNumber,
             entry.ThreadId,
             entry.ThreadRole.ToString(),
-            string.IsNullOrEmpty(entry.Category) ? null : entry.Category);
+            string.IsNullOrEmpty(entry.Category) ? null : entry.Category,
+            string.IsNullOrEmpty(entry.CorrelationId) ? null : entry.CorrelationId,
+            string.IsNullOrEmpty(entry.TraceId) ? null : entry.TraceId,
+            string.IsNullOrEmpty(entry.SpanId) ? null : entry.SpanId);
 
         _writer.WriteLine(JsonSerializer.Serialize(line, _json));
     }
@@ -61,5 +64,8 @@ internal sealed class JsonLinesSink : ILogSink
         [property: JsonPropertyName("line")]   int Line,
         [property: JsonPropertyName("thread")] int Thread,
         [property: JsonPropertyName("role")]   string Role,
-        [property: JsonPropertyName("scope")]  string? Scope);
+        [property: JsonPropertyName("scope")]  string? Scope,
+        [property: JsonPropertyName("correlation")] string? Correlation,
+        [property: JsonPropertyName("trace")] string? Trace,
+        [property: JsonPropertyName("span")] string? Span);
 }

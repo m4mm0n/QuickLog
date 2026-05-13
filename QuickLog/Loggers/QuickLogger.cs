@@ -116,7 +116,7 @@ public class QuickLogger : IQuickLog, ICloneable
     /// </summary>
     /// <param name="name"></param>
     /// <returns></returns>
-    public IDisposable Scope(string name) => LogScope.Push(name);
+    public IDisposable Scope(string name) => QuickLog.Core.LogScope.Push(name);
 
     /// <summary>
     /// Gets or sets the number of files to process in each batch operation.
@@ -227,12 +227,15 @@ public class QuickLogger : IQuickLog, ICloneable
                 ? args.Exception.ToStringDemystified()
                 : args.Message ?? string.Empty,
             "QuickLogger",
-            LogScope.Current,
+            QuickLog.Core.LogScope.Current,
             args.CallerName,
             args.CallerFilePath,
             args.CallerLineNumber,
             Environment.CurrentManagedThreadId,
-            ThreadContext.Role
+            ThreadContext.Role,
+            LogContext.CurrentCorrelationId,
+            LogContext.CurrentTraceId,
+            LogContext.CurrentSpanId
         ));
     }
 
@@ -253,12 +256,15 @@ public class QuickLogger : IQuickLog, ICloneable
             logType,
             message,
             "QuickLogger",
-            LogScope.Current,
+            QuickLog.Core.LogScope.Current,
             callerName,
             callerFilePath,
             callerLineNumber,
             Environment.CurrentManagedThreadId,
-            ThreadContext.Role
+            ThreadContext.Role,
+            LogContext.CurrentCorrelationId,
+            LogContext.CurrentTraceId,
+            LogContext.CurrentSpanId
         ));
     }
 

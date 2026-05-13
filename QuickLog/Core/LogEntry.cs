@@ -39,6 +39,9 @@ namespace QuickLog.Core;
 /// <param name="LineNumber">The line number in the source file where the log entry was created.</param>
 /// <param name="ThreadId">The identifier of the thread on which the log entry was generated.</param>
 /// <param name="ThreadRole">The role assigned to the thread generating the log entry.</param>
+/// <param name="CorrelationId">The optional correlation identifier active when the log entry was created.</param>
+/// <param name="TraceId">The optional trace identifier active when the log entry was created.</param>
+/// <param name="SpanId">The optional span identifier active when the log entry was created.</param>
 public readonly record struct LogEntry
 (
     DateTime Timestamp,
@@ -50,5 +53,8 @@ public readonly record struct LogEntry
     string FilePath,
     int LineNumber,
     int ThreadId,
-    ThreadRole ThreadRole
+    ThreadRole ThreadRole,
+    string? CorrelationId = null,
+    string? TraceId = null,
+    string? SpanId = null
 );

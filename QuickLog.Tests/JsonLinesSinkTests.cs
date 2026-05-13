@@ -75,6 +75,25 @@ public sealed class JsonLinesSinkTests : IDisposable
     }
 
     [Fact]
+    public void Write_ContextFields_AreIncludedInJson()
+    {
+        using var correlation = QuickLog.LogContext.BeginCorrelation("corr-123");
+        var entry = new LogEntry(
+            DateTime.UtcNow, LogType.Info, "context json", "TestLogger",
+            QuickLog.LogScope.Current, "Member", "file.cs", 10, 1, ThreadRole.Unknown,
+            QuickLog.LogContext.CurrentCorrelationId, "trace-1", "span-1");
+
+        using (var sink = new JsonLinesSink(_path))
+            sink.Write(in entry);
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(_path));
+        var root = doc.RootElement;
+        Assert.Equal("corr-123", root.GetProperty("correlation").GetString());
+        Assert.Equal("trace-1", root.GetProperty("trace").GetString());
+        Assert.Equal("span-1", root.GetProperty("span").GetString());
+    }
+
+    [Fact]
     public void Write_TimestampIsIso8601Utc()
     {
         using (var sink = new JsonLinesSink(_path))
