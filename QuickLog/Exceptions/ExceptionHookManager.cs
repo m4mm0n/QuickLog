@@ -8,6 +8,7 @@
  * ====================================================================================================
  */
 
+using QuickLog.Core;
 using QuickLog.Utilities;
 
 namespace QuickLog.Exceptions;
@@ -191,7 +192,25 @@ public static class ExceptionHookManager
         string? dumpPath = null;
         if (opts.CrashDump is { Enabled: true })
         {
-            try { dumpPath = CrashDumpWriter.Write(exception, source, isTerminating, opts.CrashDump); }
+            try
+            {
+                IReadOnlyList<LogEventArgs>? recentLogs = null;
+                LogDispatcherStats? dispatcherStats = null;
+
+                if (logger is QuickLog.Loggers.QuickLogger quickLogger)
+                {
+                    recentLogs = quickLogger.GetRecentLogs();
+                    dispatcherStats = quickLogger.GetStats();
+                }
+
+                dumpPath = CrashDumpWriter.Write(
+                    exception,
+                    source,
+                    isTerminating,
+                    opts.CrashDump,
+                    recentLogs,
+                    dispatcherStats);
+            }
             catch { /* dump errors must not abort the handler */ }
         }
 

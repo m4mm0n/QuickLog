@@ -112,6 +112,42 @@ public sealed class CrashDumpTests : IDisposable
         Assert.Equal(2, inners.GetArrayLength());
     }
 
+    [Fact]
+    public void Write_IncludesRecentLogsAndDispatcherStats_WhenSnapshotProvided()
+    {
+        using var logger = new QuickLog.Loggers.QuickLogger();
+        logger.EnableAsyncLogging = true;
+
+        using (QuickLog.LogContext.BeginCorrelation("crash-corr"))
+        using (QuickLog.LogScope.Begin("CrashScope"))
+        {
+            logger.Log(LogType.Info, "before crash");
+        }
+
+        logger.Shutdown();
+
+        var options = Opts();
+        options.IncludeRecentLogs = true;
+        options.RecentLogCount = 8;
+        options.IncludeDispatcherStats = true;
+
+        var path = CrashDumpWriter.Write(
+            new InvalidOperationException("boom"),
+            ExceptionSource.AppDomain,
+            isTerminating: true,
+            options,
+            logger.GetRecentLogs(),
+            logger.GetStats());
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(path!));
+        var root = doc.RootElement;
+        var recent = root.GetProperty("RecentLogs");
+        Assert.Contains("before crash", recent[0].GetProperty("Message").GetString());
+        Assert.Equal("CrashScope", recent[0].GetProperty("Scope").GetString());
+        Assert.Equal("crash-corr", recent[0].GetProperty("CorrelationId").GetString());
+        Assert.True(root.GetProperty("Dispatcher").GetProperty("Written").GetInt64() >= 1);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_dumpDir))

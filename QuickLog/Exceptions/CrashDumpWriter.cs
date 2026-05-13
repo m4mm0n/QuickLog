@@ -13,6 +13,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using QuickLog.Core;
 using QuickLog.Utilities;
 
 namespace QuickLog.Exceptions;
@@ -32,7 +33,13 @@ internal static class CrashDumpWriter
     /// Writes a crash dump for <paramref name="exception"/> and returns the full path of the
     /// file created, or <see langword="null"/> if writing failed.
     /// </summary>
-    internal static string? Write(Exception exception, ExceptionSource source, bool isTerminating, CrashDumpOptions opts)
+    internal static string? Write(
+        Exception exception,
+        ExceptionSource source,
+        bool isTerminating,
+        CrashDumpOptions opts,
+        IReadOnlyList<LogEventArgs>? recentLogs = null,
+        LogDispatcherStats? dispatcherStats = null)
     {
         try
         {
@@ -44,7 +51,7 @@ internal static class CrashDumpWriter
             var fileName = $"crash_{stamp}_{typeName}.json";
             var fullPath = Path.Combine(dir, fileName);
 
-            var report = BuildReport(exception, source, isTerminating, opts);
+            var report = BuildReport(exception, source, isTerminating, opts, recentLogs, dispatcherStats);
             var json = JsonSerializer.Serialize(report, _json);
             File.WriteAllText(fullPath, json, Encoding.UTF8);
 
@@ -57,7 +64,13 @@ internal static class CrashDumpWriter
         }
     }
 
-    private static CrashReport BuildReport(Exception exception, ExceptionSource source, bool isTerminating, CrashDumpOptions opts)
+    private static CrashReport BuildReport(
+        Exception exception,
+        ExceptionSource source,
+        bool isTerminating,
+        CrashDumpOptions opts,
+        IReadOnlyList<LogEventArgs>? recentLogs,
+        LogDispatcherStats? dispatcherStats)
     {
         var proc = Process.GetCurrentProcess();
 
@@ -87,8 +100,36 @@ internal static class CrashDumpWriter
                 WorkingDirectory  = System.Environment.CurrentDirectory,
                 CommandLine       = System.Environment.CommandLine,
                 Variables         = opts.IncludeEnvironmentVariables ? GetEnvVars() : null
-            }
+            },
+            RecentLogs = opts.IncludeRecentLogs
+                ? BuildRecentLogs(recentLogs, opts.RecentLogCount)
+                : null,
+            Dispatcher = opts.IncludeDispatcherStats ? dispatcherStats : null
         };
+    }
+
+    private static List<RecentLogInfo>? BuildRecentLogs(IReadOnlyList<LogEventArgs>? recentLogs, int count)
+    {
+        if (recentLogs is null || recentLogs.Count == 0 || count <= 0)
+            return null;
+
+        return recentLogs
+            .Skip(Math.Max(0, recentLogs.Count - count))
+            .Select(e => new RecentLogInfo
+            {
+                Timestamp     = e.Timestamp,
+                Level         = e.LoggingType.ToString(),
+                Message       = e.Message,
+                Exception     = e.Exception?.ToStringDemystified(),
+                Member        = e.CallerName,
+                File          = e.CallerFilePath,
+                Line          = e.CallerLineNumber,
+                Scope         = e.Scope,
+                CorrelationId = e.CorrelationId,
+                TraceId       = e.TraceId,
+                SpanId        = e.SpanId
+            })
+            .ToList();
     }
 
     private static ExceptionInfo BuildExceptionInfo(Exception? ex)
@@ -148,6 +189,8 @@ internal sealed class CrashReport
     public ExceptionInfo  Exception     { get; init; } = new();
     public ProcessInfo    Process       { get; init; } = new();
     public EnvironmentInfo Environment  { get; init; } = new();
+    public List<RecentLogInfo>? RecentLogs { get; init; }
+    public LogDispatcherStats? Dispatcher { get; init; }
 }
 
 internal sealed class ExceptionInfo
@@ -178,4 +221,19 @@ internal sealed class EnvironmentInfo
     public string  WorkingDirectory { get; init; } = string.Empty;
     public string  CommandLine      { get; init; } = string.Empty;
     public Dictionary<string, string>? Variables { get; init; }
+}
+
+internal sealed class RecentLogInfo
+{
+    public string  Timestamp     { get; init; } = string.Empty;
+    public string  Level         { get; init; } = string.Empty;
+    public string? Message       { get; init; }
+    public string? Exception     { get; init; }
+    public string  Member        { get; init; } = string.Empty;
+    public string  File          { get; init; } = string.Empty;
+    public int     Line          { get; init; }
+    public string? Scope         { get; init; }
+    public string? CorrelationId { get; init; }
+    public string? TraceId       { get; init; }
+    public string? SpanId        { get; init; }
 }

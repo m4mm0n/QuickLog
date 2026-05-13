@@ -41,6 +41,21 @@ public sealed class CrashDumpOptions
     /// </summary>
     public bool IncludeEnvironmentVariables { get; set; } = false;
 
+    /// <summary>
+    /// When <see langword="true"/>, the crash report includes a tail of recent in-memory log entries.
+    /// </summary>
+    public bool IncludeRecentLogs { get; set; } = true;
+
+    /// <summary>
+    /// Maximum number of recent log entries to include when <see cref="IncludeRecentLogs"/> is enabled.
+    /// </summary>
+    public int RecentLogCount { get; set; } = 128;
+
+    /// <summary>
+    /// When <see langword="true"/>, the crash report includes async dispatcher health counters.
+    /// </summary>
+    public bool IncludeDispatcherStats { get; set; } = true;
+
     internal string ResolvedOutputDirectory =>
         OutputDirectory ?? Path.Combine(Path.GetTempPath(), "QuickLogCrashDumps");
 }
