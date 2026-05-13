@@ -10,7 +10,7 @@ namespace QuickLog.Sinks;
 /// </summary>
 internal sealed class JsonLinesSink : ILogSink
 {
-    private readonly StreamWriter _writer;
+    private readonly RotatingFileWriter _writer;
 
     private static readonly JsonSerializerOptions _json = new()
     {
@@ -18,12 +18,9 @@ internal sealed class JsonLinesSink : ILogSink
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public JsonLinesSink(string path)
+    public JsonLinesSink(string path, LogRotationOptions? rotation = null)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
-        _writer = new StreamWriter(
-            new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
-        { AutoFlush = false };
+        _writer = new RotatingFileWriter(path, rotation);
     }
 
     public void Write(in LogEntry entry)

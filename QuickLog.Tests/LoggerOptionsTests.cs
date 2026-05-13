@@ -83,6 +83,17 @@ public sealed class LoggerOptionsTests : IDisposable
     }
 
     [Fact]
+    public void WithRotation_ConfiguresRotationOptions()
+    {
+        var opts = new LoggerOptions().WithRotation(1024, maxFiles: 7, rotateOnStartup: true);
+
+        Assert.NotNull(opts.Rotation);
+        Assert.Equal(1024, opts.Rotation.MaxFileBytes);
+        Assert.Equal(7, opts.Rotation.MaxFiles);
+        Assert.True(opts.Rotation.RotateOnStartup);
+    }
+
+    [Fact]
     public void WithFilter_SetsDelegate()
     {
         Func<LogEventArgs, bool> f = _ => true;

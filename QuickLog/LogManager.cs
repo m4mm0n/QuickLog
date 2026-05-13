@@ -141,6 +141,7 @@ public static class LogManager
             EnableAsyncBinaryLogging = options.AsyncBinaryLogging,
             BinaryLogPath           = options.BinaryLogPath,
             EnableAsyncTraceLogging = options.AsyncTraceLogging,
+            Rotation                = options.Rotation,
             Filter                  = options.Filter
         };
         _configured = true;

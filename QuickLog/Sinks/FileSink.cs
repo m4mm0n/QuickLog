@@ -34,16 +34,13 @@ namespace QuickLog.Sinks;
 /// Call Dispose to ensure all buffered entries are flushed and resources are released.</remarks>
 internal sealed class FileSink : ILogSink
 {
-    private readonly StreamWriter _writer;
+    private readonly RotatingFileWriter _writer;
     private readonly ConcurrentQueue<LogEntry> _queue = new();
     private readonly int _batchSize;
 
-    public FileSink(string path, int batchSize)
+    public FileSink(string path, int batchSize, LogRotationOptions? rotation = null)
     {
-        _writer = new StreamWriter(path, append: true)
-        {
-            AutoFlush = false
-        };
+        _writer = new RotatingFileWriter(path, rotation);
         _batchSize = Math.Max(1, batchSize);
     }
 
@@ -57,8 +54,14 @@ internal sealed class FileSink : ILogSink
     public void Flush()
     {
         while (_queue.TryDequeue(out var e))
+        {
+            var context = string.IsNullOrWhiteSpace(e.CorrelationId)
+                ? string.Empty
+                : $" [{e.CorrelationId}]";
+
             _writer.WriteLine(
-                $"[{e.Timestamp:O}] [{e.Level}] {e.Message}");
+                $"[{e.Timestamp:O}] [{e.Level}] [{e.ThreadRole}]{context} {e.Message}");
+        }
 
         _writer.Flush();
     }

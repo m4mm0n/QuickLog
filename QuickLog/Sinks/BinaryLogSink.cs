@@ -38,18 +38,15 @@ namespace QuickLog.Sinks;
 /// appropriate synchronization if used from multiple threads.</remarks>
 internal sealed class BinaryLogSink : ILogSink
 {
-    private readonly FileStream _stream;
-    private readonly BinaryWriter _writer;
+    private readonly RotatingFileWriter _writer;
     private readonly Crc32 _crc = new();
 
     private static readonly byte[] Magic = "QLOG"u8.ToArray();
     private const int Version = 2;
 
-    public BinaryLogSink(string path)
+    public BinaryLogSink(string path, LogRotationOptions? rotation = null)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        _stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read);
-        _writer = new BinaryWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        _writer = new RotatingFileWriter(path, rotation);
     }
 
     public void Write(in LogEntry entry)
@@ -77,9 +74,11 @@ internal sealed class BinaryLogSink : ILogSink
 
         var data = ms.ToArray();
         var crc = _crc.CalculateChecksum(data);
+        var record = new byte[data.Length + sizeof(uint)];
+        Buffer.BlockCopy(data, 0, record, 0, data.Length);
+        Buffer.BlockCopy(BitConverter.GetBytes(crc), 0, record, data.Length, sizeof(uint));
 
-        _writer.Write(data);
-        _writer.Write(crc);
+        _writer.WriteBytes(record);
     }
 
     private static void WriteString(BinaryWriter bw, string? value)
@@ -101,6 +100,5 @@ internal sealed class BinaryLogSink : ILogSink
     {
         Flush();
         _writer.Dispose();
-        _stream.Dispose();
     }
 }

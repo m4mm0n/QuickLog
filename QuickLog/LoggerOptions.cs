@@ -68,6 +68,9 @@ public sealed class LoggerOptions
     /// <summary>Thread role that is never dropped (used with <see cref="AsyncDropPolicy.DropByThreadRole"/>).</summary>
     public ThreadRole AsyncProtectedRole { get; set; } = ThreadRole.Audio;
 
+    /// <summary>Optional size-based rotation settings for file-backed sinks.</summary>
+    public LogRotationOptions? Rotation { get; set; }
+
     // ── Filtering ─────────────────────────────────────────────────────────────
 
     /// <summary>Optional predicate applied before dispatching. Return <see langword="false"/> to drop an entry.</summary>
@@ -127,6 +130,18 @@ public sealed class LoggerOptions
         BinaryLogPath = path;
         AsyncBinaryLogging = true;
         AsyncLogging = true;
+        return this;
+    }
+
+    /// <summary>Enable size-based rotation for file-backed sinks.</summary>
+    public LoggerOptions WithRotation(long maxFileBytes, int maxFiles = 5, bool rotateOnStartup = false)
+    {
+        Rotation = new LogRotationOptions
+        {
+            MaxFileBytes = maxFileBytes,
+            MaxFiles = maxFiles,
+            RotateOnStartup = rotateOnStartup
+        };
         return this;
     }
 

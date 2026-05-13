@@ -151,6 +151,9 @@ public class QuickLogger : IQuickLog, ICloneable
     /// <summary>Thread role that is shielded from dropping under <see cref="AsyncDropPolicy.DropByThreadRole"/>.</summary>
     public ThreadRole AsyncProtectedRole { get; set; } = ThreadRole.Audio;
 
+    /// <summary>Optional size-based rotation settings for file-backed async sinks.</summary>
+    public LogRotationOptions? Rotation { get; set; }
+
     /// <summary>
     /// Returns a snapshot of recent log entries captured by the async memory sink.
     /// Returns an empty list if async logging is disabled.
@@ -281,7 +284,7 @@ public class QuickLogger : IQuickLog, ICloneable
 
         // Optional async file sink (batched)
         if (EnableAsyncFileLogging && !string.IsNullOrWhiteSpace(LogPath))
-            _asyncSinks.Add(new FileSink(Path.Combine(LogPath, "quicklog.async.log"), AsyncFileBatchSize));
+            _asyncSinks.Add(new FileSink(Path.Combine(LogPath, "quicklog.async.log"), AsyncFileBatchSize, Rotation));
 
         // Optional async trace sink
         if (EnableAsyncTraceLogging)
@@ -289,11 +292,11 @@ public class QuickLogger : IQuickLog, ICloneable
 
         // Optional JSON Lines sink
         if (!string.IsNullOrWhiteSpace(JsonLogPath))
-            _asyncSinks.Add(new JsonLinesSink(JsonLogPath));
+            _asyncSinks.Add(new JsonLinesSink(JsonLogPath, Rotation));
 
         // Optional compact binary sink
         if (EnableAsyncBinaryLogging && !string.IsNullOrWhiteSpace(BinaryLogPath))
-            _asyncSinks.Add(new BinaryLogSink(BinaryLogPath));
+            _asyncSinks.Add(new BinaryLogSink(BinaryLogPath, Rotation));
 
         _asyncDispatcher = new AsyncLogDispatcher(_asyncSinks)
         {
