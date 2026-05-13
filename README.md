@@ -78,6 +78,9 @@ and message-template complexity. What you get instead is **clarity, control, and
 - Binary log reader
 - Binary log exporter
 - Binary log query/filtering by level, time, correlation, or text
+- Zero-dependency `QuickLog.Tools` CLI
+- Doctor / inspect / replay / benchmark / bundle commands
+- Source-less launch and passive observe helpers
 - Timeline TUI viewer
 - Colorized output
 - Search + highlighting
@@ -478,6 +481,56 @@ F5         Save filter preset
 F9         Load filter preset
 Esc        Exit
 ```
+
+---
+
+## QuickLog.Tools *(v2.2 Experimental)*
+
+`QuickLog.Tools` is a zero-external-dependency companion CLI. It references
+QuickLog, uses only the .NET runtime libraries, and keeps the core logger clean.
+
+Run it from the repo:
+
+```powershell
+dotnet run --project QuickLog.Tools -- doctor logs --recursive
+dotnet run --project QuickLog.Tools -- inspect logs/app.qlog --level Error --correlation match-7
+dotnet run --project QuickLog.Tools -- replay logs/app.qlog --to jsonl --out logs/app.replay.jsonl
+dotnet run --project QuickLog.Tools -- benchmark --iterations 10000 --mode binary
+dotnet run --project QuickLog.Tools -- bundle --out support.zip --logs logs --crashes crashes --include-env --include-exports
+```
+
+### Source-less Diagnostics
+
+Use `launch` when QuickLog should start the selected app and capture stdout,
+stderr, process lifetime, and QuickLog session artifacts:
+
+```powershell
+dotnet run --project QuickLog.Tools -- launch --out sessions/app --diagnostic-env --wait-for-exit -- dotnet --info
+```
+
+Use `observe` when the process is already running:
+
+```powershell
+dotnet run --project QuickLog.Tools -- observe --pid 1234 --duration 10 --out sessions/observe-1234
+```
+
+`observe` is passive. It records process metadata, memory/thread samples, and a
+best-effort diagnostic-port probe. It does not inject code into the process and
+does not claim deep EventPipe capture without the diagnostics client dependency
+that QuickLog intentionally avoids.
+
+### Profiler Helper
+
+The profiler command is an experimental helper for CLR profiler environment
+blocks. It does not ship a native profiler DLL.
+
+```powershell
+dotnet run --project QuickLog.Tools -- profiler explain
+dotnet run --project QuickLog.Tools -- profiler env --clsid 00000000-0000-0000-0000-000000000000 --path C:\Tools\Profiler.dll
+```
+
+Only use launch, observe, or profiler settings on applications you own or are
+authorized to inspect.
 
 ---
 
