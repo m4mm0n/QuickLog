@@ -73,6 +73,16 @@ public sealed class LoggerOptionsTests : IDisposable
     }
 
     [Fact]
+    public void WithBinaryLog_SetsPathAndEnablesAsyncBinaryLogging()
+    {
+        var opts = new LoggerOptions().WithBinaryLog("logs/app.qlog");
+
+        Assert.Equal("logs/app.qlog", opts.BinaryLogPath);
+        Assert.True(opts.AsyncBinaryLogging);
+        Assert.True(opts.AsyncLogging);
+    }
+
+    [Fact]
     public void WithFilter_SetsDelegate()
     {
         Func<LogEventArgs, bool> f = _ => true;

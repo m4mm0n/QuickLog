@@ -100,6 +100,22 @@ public sealed class BinaryLogRoundtripTests : IDisposable
         Assert.Equal(string.Empty, e.Category);
     }
 
+    [Fact]
+    public void QuickLogger_WithAsyncBinaryLogging_WritesReadableBinaryLog()
+    {
+        using var logger = new QuickLog.Loggers.QuickLogger();
+        logger.EnableAsyncLogging = true;
+        logger.EnableAsyncBinaryLogging = true;
+        logger.BinaryLogPath = _path;
+
+        logger.Log(LogType.Warn, "binary through logger");
+        logger.Shutdown();
+
+        var entry = BinaryLogReader.Read(_path).Single();
+        Assert.Equal(LogType.Warn, entry.Level);
+        Assert.Equal("binary through logger", entry.Message);
+    }
+
     public void Dispose()
     {
         if (File.Exists(_path)) File.Delete(_path);

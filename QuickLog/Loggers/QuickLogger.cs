@@ -285,6 +285,10 @@ public class QuickLogger : IQuickLog, ICloneable
         if (!string.IsNullOrWhiteSpace(JsonLogPath))
             _asyncSinks.Add(new JsonLinesSink(JsonLogPath));
 
+        // Optional compact binary sink
+        if (EnableAsyncBinaryLogging && !string.IsNullOrWhiteSpace(BinaryLogPath))
+            _asyncSinks.Add(new BinaryLogSink(BinaryLogPath));
+
         _asyncDispatcher = new AsyncLogDispatcher(_asyncSinks)
         {
             DropPolicy    = this.AsyncDropPolicy,

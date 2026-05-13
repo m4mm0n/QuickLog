@@ -138,6 +138,8 @@ public static class LogManager
             AsyncMinimumLevel       = options.AsyncMinimumLevel,
             AsyncProtectedRole      = options.AsyncProtectedRole,
             JsonLogPath             = options.JsonLogPath,
+            EnableAsyncBinaryLogging = options.AsyncBinaryLogging,
+            BinaryLogPath           = options.BinaryLogPath,
             EnableAsyncTraceLogging = options.AsyncTraceLogging,
             Filter                  = options.Filter
         };

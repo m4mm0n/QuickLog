@@ -53,6 +53,12 @@ public sealed class LoggerOptions
     /// <summary>Path for JSON Lines output (one JSON object per line). <see langword="null"/> = disabled.</summary>
     public string? JsonLogPath { get; set; }
 
+    /// <summary>Write compact binary log records on the async pipeline.</summary>
+    public bool AsyncBinaryLogging { get; set; }
+
+    /// <summary>Path for compact binary log output. <see langword="null"/> = disabled.</summary>
+    public string? BinaryLogPath { get; set; }
+
     /// <summary>Drop policy when the async queue is full. Default: <see cref="AsyncDropPolicy.DropBelowLevel"/>.</summary>
     public AsyncDropPolicy AsyncDropPolicy { get; set; } = AsyncDropPolicy.DropBelowLevel;
 
@@ -114,6 +120,15 @@ public sealed class LoggerOptions
 
     /// <summary>Write one JSON object per log entry to the given file path (JSON Lines / NDJSON).</summary>
     public LoggerOptions WithJsonLog(string path) { JsonLogPath = path; return this; }
+
+    /// <summary>Write compact binary log entries to the given file path on the async pipeline.</summary>
+    public LoggerOptions WithBinaryLog(string path)
+    {
+        BinaryLogPath = path;
+        AsyncBinaryLogging = true;
+        AsyncLogging = true;
+        return this;
+    }
 
     /// <summary>Apply a filter predicate; entries for which the predicate returns <see langword="false"/> are dropped.</summary>
     public LoggerOptions WithFilter(Func<LogEventArgs, bool> filter) { Filter = filter; return this; }
