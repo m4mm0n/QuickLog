@@ -1,17 +1,29 @@
 namespace QuickLog.Tools;
 
+using QuickLog.Tools.Commands;
+
 public static class ToolApplication
 {
-    public static Task<int> RunAsync(string[] args, IToolConsole console, CancellationToken cancellationToken = default)
+    public static async Task<int> RunAsync(string[] args, IToolConsole console, CancellationToken cancellationToken = default)
     {
         var parsed = ToolCommandParser.Parse(args);
         if (!parsed.Success)
         {
             console.ErrorLine(parsed.Error ?? "Invalid command.");
-            return Task.FromResult(2);
+            return 2;
         }
 
-        console.WriteLine(parsed.Command?.ToString() ?? "No command.");
-        return Task.FromResult(0);
+        var result = parsed.Command switch
+        {
+            DoctorToolCommand command => await DoctorCommand.ExecuteAsync(command, console, cancellationToken),
+            InspectToolCommand command => await InspectCommand.ExecuteAsync(command, console, cancellationToken),
+            ReplayToolCommand command => await ReplayCommand.ExecuteAsync(command, console, cancellationToken),
+            _ => CommandResult.Fail(2)
+        };
+
+        if (result.ExitCode == 2 && parsed.Command is not (DoctorToolCommand or InspectToolCommand or ReplayToolCommand))
+            console.ErrorLine($"Command not implemented yet: {parsed.Command?.GetType().Name}");
+
+        return result.ExitCode;
     }
 }
