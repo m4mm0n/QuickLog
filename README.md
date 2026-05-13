@@ -12,6 +12,55 @@ and message-template complexity. What you get instead is **clarity, control, and
 
 ---
 
+## Install
+
+```powershell
+dotnet add package ZLS.QuickLog --version 2.2.0
+```
+
+QuickLog targets `net8.0` and `net10.0`, ships with XML documentation, and has
+no external package dependencies.
+
+---
+
+## Quick Start
+
+```csharp
+using QuickLog;
+using QuickLog.Loggers;
+
+var logger = new QuickLogger(
+    logFilePath: "logs/app.log",
+    consoleLogging: true,
+    fileLogging: true);
+
+logger.Log(LogType.Info, "Hello QuickLog");
+logger.Log(LogType.Warn, "Something might be wrong");
+logger.Log(LogType.Error, new Exception("Boom"));
+
+logger.Dispose();
+```
+
+For application-wide setup:
+
+```csharp
+LogManager.ConfigureDefault(
+    new LoggerOptions()
+        .WithAsyncOnly()
+        .WithJsonLog("logs/app.jsonl")
+        .WithBinaryLog("logs/app.qlog")
+        .WithRotation(maxFileBytes: 16 * 1024 * 1024, maxFiles: 5)
+        .WithRedaction()
+        .WithSpamControl(duplicateThreshold: 8));
+
+var log = LogManager.GetDefaultLogger();
+log.Log(LogType.Info, "QuickLog is online");
+
+LogManager.Shutdown();
+```
+
+---
+
 ## Core Principles
 
 - **Deterministic behavior**

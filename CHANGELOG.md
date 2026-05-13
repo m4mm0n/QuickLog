@@ -54,6 +54,7 @@ This changelog follows Semantic Versioning and Keep a Changelog style sections.
 - Changed crash dumps to include recent logs and dispatcher health when available.
 - Changed async dispatcher behavior to survive sink failures instead of letting a sink exception stop dispatch.
 - Changed samples and README to demonstrate v2.2 engine-mode configuration.
+- Changed NuGet package README metadata to include an install command, target framework information, zero-dependency note, and quick-start examples.
 - Changed local repository hygiene to ignore `.worktrees/`.
 
 ### Fixed
