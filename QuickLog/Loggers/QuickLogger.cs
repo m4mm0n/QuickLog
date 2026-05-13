@@ -60,6 +60,7 @@ public class QuickLogger : IQuickLog, ICloneable
     /// </summary>
     private AsyncLogDispatcher? _asyncDispatcher;
     private LogDispatcherStats? _lastStats;
+    private LogSpamController? _spamController;
 
     /// <summary>
     /// Enables or disables logging to the console.
@@ -161,6 +162,9 @@ public class QuickLogger : IQuickLog, ICloneable
     /// <summary>Optional redaction settings applied before entries enter async sinks.</summary>
     public LogRedactionOptions? Redaction { get; set; }
 
+    /// <summary>Optional duplicate coalescing settings for the async path.</summary>
+    public LogSpamControlOptions? SpamControl { get; set; }
+
     /// <summary>
     /// Returns a snapshot of recent log entries captured by the async memory sink.
     /// Returns an empty list if async logging is disabled.
@@ -236,7 +240,7 @@ public class QuickLogger : IQuickLog, ICloneable
 
         EnsureAsyncDispatcher();
 
-        _asyncDispatcher?.Enqueue(new LogEntry(
+        EnqueueAsyncEntry(new LogEntry(
             DateTime.UtcNow,
             args.LoggingType,
             Redact(args.Exception != null
@@ -267,7 +271,7 @@ public class QuickLogger : IQuickLog, ICloneable
 
         EnsureAsyncDispatcher();
 
-        _asyncDispatcher?.Enqueue(new LogEntry(
+        EnqueueAsyncEntry(new LogEntry(
             DateTime.UtcNow,
             logType,
             Redact(message),
@@ -288,6 +292,32 @@ public class QuickLogger : IQuickLog, ICloneable
         => Redaction is { Enabled: true } options
             ? new LogRedactor(options).Redact(value)
             : value;
+
+    private void EnqueueAsyncEntry(in LogEntry entry)
+    {
+        EnsureAsyncDispatcher();
+        if (_asyncDispatcher is null)
+            return;
+
+        if (SpamControl is { Enabled: true } options)
+        {
+            _spamController ??= new LogSpamController(options);
+            foreach (var candidate in _spamController.Process(entry))
+                _asyncDispatcher.Enqueue(candidate);
+            return;
+        }
+
+        _asyncDispatcher.Enqueue(entry);
+    }
+
+    private void FlushSpamControl()
+    {
+        if (_asyncDispatcher is null || _spamController is null)
+            return;
+
+        foreach (var candidate in _spamController.Flush())
+            _asyncDispatcher.Enqueue(candidate);
+    }
 
     private void EnsureAsyncDispatcher()
     {
@@ -552,17 +582,22 @@ public class QuickLogger : IQuickLog, ICloneable
     /// <summary>
     /// Flushes any pending asynchronous log entries.
     /// </summary>
-    public void Flush() => _asyncDispatcher?.Flush();
+    public void Flush()
+    {
+        FlushSpamControl();
+        _asyncDispatcher?.Flush();
+    }
 
     /// <summary>
     /// Shuts down asynchronous logging and releases resources.
     /// </summary>
     public void Shutdown()
     {
-        _asyncDispatcher?.Flush();
+        Flush();
         _lastStats = _asyncDispatcher?.GetStats();
         _asyncDispatcher?.Dispose();
         _asyncDispatcher = null;
+        _spamController = null;
     }
     /// <summary>
     /// Disposes of the internal loggers.

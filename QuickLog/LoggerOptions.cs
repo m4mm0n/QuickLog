@@ -77,6 +77,9 @@ public sealed class LoggerOptions
     /// <summary>Optional sensitive value redaction settings.</summary>
     public LogRedactionOptions? Redaction { get; set; }
 
+    /// <summary>Optional duplicate coalescing settings for the async path.</summary>
+    public LogSpamControlOptions? SpamControl { get; set; }
+
     // ── Filtering ─────────────────────────────────────────────────────────────
 
     /// <summary>Optional predicate applied before dispatching. Return <see langword="false"/> to drop an entry.</summary>
@@ -163,6 +166,17 @@ public sealed class LoggerOptions
     {
         Redaction = new LogRedactionOptions();
         configure?.Invoke(Redaction);
+        return this;
+    }
+
+    /// <summary>Enable duplicate message coalescing on the async path.</summary>
+    public LoggerOptions WithSpamControl(int duplicateThreshold = 8)
+    {
+        SpamControl = new LogSpamControlOptions
+        {
+            Enabled = true,
+            DuplicateThreshold = duplicateThreshold
+        };
         return this;
     }
 

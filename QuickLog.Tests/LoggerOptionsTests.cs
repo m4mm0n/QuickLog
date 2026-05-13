@@ -111,6 +111,16 @@ public sealed class LoggerOptionsTests : IDisposable
     }
 
     [Fact]
+    public void WithSpamControl_ConfiguresDuplicateThreshold()
+    {
+        var opts = new LoggerOptions().WithSpamControl(5);
+
+        Assert.NotNull(opts.SpamControl);
+        Assert.True(opts.SpamControl.Enabled);
+        Assert.Equal(5, opts.SpamControl.DuplicateThreshold);
+    }
+
+    [Fact]
     public void WithFilter_SetsDelegate()
     {
         Func<LogEventArgs, bool> f = _ => true;

@@ -144,6 +144,7 @@ public static class LogManager
             Rotation                = options.Rotation,
             AsyncQueueCapacity      = options.AsyncQueueCapacity,
             Redaction               = options.Redaction,
+            SpamControl             = options.SpamControl,
             Filter                  = options.Filter
         };
         _configured = true;
