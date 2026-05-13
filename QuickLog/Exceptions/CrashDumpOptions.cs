@@ -10,6 +10,8 @@
 
 namespace QuickLog.Exceptions;
 
+using QuickLog.Core;
+
 /// <summary>
 /// Controls the structured crash-dump report written by <see cref="ExceptionHookManager"/>
 /// when an unhandled exception is captured.
@@ -55,6 +57,11 @@ public sealed class CrashDumpOptions
     /// When <see langword="true"/>, the crash report includes async dispatcher health counters.
     /// </summary>
     public bool IncludeDispatcherStats { get; set; } = true;
+
+    /// <summary>
+    /// Sensitive value redaction applied to crash report text fields.
+    /// </summary>
+    public LogRedactionOptions Redaction { get; set; } = new();
 
     internal string ResolvedOutputDirectory =>
         OutputDirectory ?? Path.Combine(Path.GetTempPath(), "QuickLogCrashDumps");

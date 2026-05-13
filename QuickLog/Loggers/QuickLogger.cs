@@ -158,6 +158,9 @@ public class QuickLogger : IQuickLog, ICloneable
     /// <summary>Maximum number of entries buffered by the async dispatcher.</summary>
     public int AsyncQueueCapacity { get; set; } = 8192;
 
+    /// <summary>Optional redaction settings applied before entries enter async sinks.</summary>
+    public LogRedactionOptions? Redaction { get; set; }
+
     /// <summary>
     /// Returns a snapshot of recent log entries captured by the async memory sink.
     /// Returns an empty list if async logging is disabled.
@@ -236,9 +239,9 @@ public class QuickLogger : IQuickLog, ICloneable
         _asyncDispatcher?.Enqueue(new LogEntry(
             DateTime.UtcNow,
             args.LoggingType,
-            args.Exception != null
+            Redact(args.Exception != null
                 ? args.Exception.ToStringDemystified()
-                : args.Message ?? string.Empty,
+                : args.Message ?? string.Empty),
             "QuickLogger",
             QuickLog.Core.LogScope.Current,
             args.CallerName,
@@ -267,7 +270,7 @@ public class QuickLogger : IQuickLog, ICloneable
         _asyncDispatcher?.Enqueue(new LogEntry(
             DateTime.UtcNow,
             logType,
-            message,
+            Redact(message),
             "QuickLogger",
             QuickLog.Core.LogScope.Current,
             callerName,
@@ -280,6 +283,11 @@ public class QuickLogger : IQuickLog, ICloneable
             LogContext.CurrentSpanId
         ));
     }
+
+    private string Redact(string value)
+        => Redaction is { Enabled: true } options
+            ? new LogRedactor(options).Redact(value)
+            : value;
 
     private void EnsureAsyncDispatcher()
     {

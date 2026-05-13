@@ -74,6 +74,9 @@ public sealed class LoggerOptions
     /// <summary>Maximum number of entries buffered by the async dispatcher.</summary>
     public int AsyncQueueCapacity { get; set; } = 8192;
 
+    /// <summary>Optional sensitive value redaction settings.</summary>
+    public LogRedactionOptions? Redaction { get; set; }
+
     // ── Filtering ─────────────────────────────────────────────────────────────
 
     /// <summary>Optional predicate applied before dispatching. Return <see langword="false"/> to drop an entry.</summary>
@@ -152,6 +155,14 @@ public sealed class LoggerOptions
     public LoggerOptions WithAsyncQueueCapacity(int capacity)
     {
         AsyncQueueCapacity = Math.Max(1, capacity);
+        return this;
+    }
+
+    /// <summary>Enable sensitive value redaction with the default rules.</summary>
+    public LoggerOptions WithRedaction(Action<LogRedactionOptions>? configure = null)
+    {
+        Redaction = new LogRedactionOptions();
+        configure?.Invoke(Redaction);
         return this;
     }
 

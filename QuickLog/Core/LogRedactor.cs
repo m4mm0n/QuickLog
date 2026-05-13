@@ -1,0 +1,51 @@
+using System.Text.RegularExpressions;
+
+namespace QuickLog.Core;
+
+/// <summary>
+/// Masks configured sensitive key values in plain-text and JSON-like log fragments.
+/// </summary>
+public sealed class LogRedactor
+{
+    private readonly LogRedactionOptions _options;
+
+    /// <summary>Creates a redactor from the supplied options.</summary>
+    public LogRedactor(LogRedactionOptions options)
+    {
+        _options = options;
+    }
+
+    /// <summary>Returns <paramref name="value"/> with configured sensitive values masked.</summary>
+    public string Redact(string? value)
+    {
+        if (string.IsNullOrEmpty(value) || !_options.Enabled)
+            return value ?? string.Empty;
+
+        var result = value;
+        foreach (var key in _options.SensitiveKeys.Where(k => !string.IsNullOrWhiteSpace(k)))
+        {
+            var escaped = Regex.Escape(key);
+            var mask = _options.Mask;
+
+            result = Regex.Replace(
+                result,
+                $"(\"{escaped}\"\\s*:\\s*\")([^\"]*)(\")",
+                $"$1{mask}$3",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            result = Regex.Replace(
+                result,
+                $"\\b({escaped})\\b\\s*=\\s*([^\\s,;]+)",
+                $"$1={mask}",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            result = Regex.Replace(
+                result,
+                $"(?<!\")\\b({escaped})\\b\\s*:\\s*([^\\s,;]+)",
+                $"$1: {mask}",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
+
+        return result;
+    }
+}

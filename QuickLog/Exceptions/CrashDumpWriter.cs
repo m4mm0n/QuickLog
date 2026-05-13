@@ -73,6 +73,7 @@ internal static class CrashDumpWriter
         LogDispatcherStats? dispatcherStats)
     {
         var proc = Process.GetCurrentProcess();
+        var redactor = new LogRedactor(opts.Redaction);
 
         return new CrashReport
         {
@@ -80,7 +81,7 @@ internal static class CrashDumpWriter
             Source        = source.ToString(),
             IsTerminating = isTerminating,
             RestartCount  = RestartOptions.CurrentRestartCount,
-            Exception     = BuildExceptionInfo(exception),
+            Exception     = BuildExceptionInfo(exception, redactor),
             Process       = new ProcessInfo
             {
                 Id          = proc.Id,
@@ -98,17 +99,20 @@ internal static class CrashDumpWriter
                 RuntimeVersion    = System.Environment.Version.ToString(),
                 Is64BitProcess    = System.Environment.Is64BitProcess,
                 WorkingDirectory  = System.Environment.CurrentDirectory,
-                CommandLine       = System.Environment.CommandLine,
-                Variables         = opts.IncludeEnvironmentVariables ? GetEnvVars() : null
+                CommandLine       = redactor.Redact(System.Environment.CommandLine),
+                Variables         = opts.IncludeEnvironmentVariables ? GetEnvVars(redactor) : null
             },
             RecentLogs = opts.IncludeRecentLogs
-                ? BuildRecentLogs(recentLogs, opts.RecentLogCount)
+                ? BuildRecentLogs(recentLogs, opts.RecentLogCount, redactor)
                 : null,
             Dispatcher = opts.IncludeDispatcherStats ? dispatcherStats : null
         };
     }
 
-    private static List<RecentLogInfo>? BuildRecentLogs(IReadOnlyList<LogEventArgs>? recentLogs, int count)
+    private static List<RecentLogInfo>? BuildRecentLogs(
+        IReadOnlyList<LogEventArgs>? recentLogs,
+        int count,
+        LogRedactor redactor)
     {
         if (recentLogs is null || recentLogs.Count == 0 || count <= 0)
             return null;
@@ -119,8 +123,8 @@ internal static class CrashDumpWriter
             {
                 Timestamp     = e.Timestamp,
                 Level         = e.LoggingType.ToString(),
-                Message       = e.Message,
-                Exception     = e.Exception?.ToStringDemystified(),
+                Message       = e.Message is null ? null : redactor.Redact(e.Message),
+                Exception     = e.Exception is null ? null : redactor.Redact(e.Exception.ToStringDemystified()),
                 Member        = e.CallerName,
                 File          = e.CallerFilePath,
                 Line          = e.CallerLineNumber,
@@ -132,31 +136,31 @@ internal static class CrashDumpWriter
             .ToList();
     }
 
-    private static ExceptionInfo BuildExceptionInfo(Exception? ex)
+    private static ExceptionInfo BuildExceptionInfo(Exception? ex, LogRedactor redactor)
     {
         if (ex is null) return new ExceptionInfo { Type = "null", Message = string.Empty };
 
         var info = new ExceptionInfo
         {
             Type       = ex.GetType().FullName ?? ex.GetType().Name,
-            Message    = ex.Message,
-            StackTrace = ex.ToStringDemystified()
+            Message    = redactor.Redact(ex.Message),
+            StackTrace = redactor.Redact(ex.ToStringDemystified())
         };
 
         if (ex is AggregateException agg && agg.InnerExceptions.Count > 0)
-            info.InnerExceptions = agg.InnerExceptions.Select(BuildExceptionInfo).ToList();
+            info.InnerExceptions = agg.InnerExceptions.Select(inner => BuildExceptionInfo(inner, redactor)).ToList();
         else if (ex.InnerException is not null)
-            info.InnerExceptions = [BuildExceptionInfo(ex.InnerException)];
+            info.InnerExceptions = [BuildExceptionInfo(ex.InnerException, redactor)];
 
         return info;
     }
 
-    private static Dictionary<string, string>? GetEnvVars()
+    private static Dictionary<string, string>? GetEnvVars(LogRedactor redactor)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (DictionaryEntry entry in System.Environment.GetEnvironmentVariables())
             if (entry.Key is string k && entry.Value is string v)
-                result[k] = v;
+                result[k] = redactor.Redact($"{k}={v}")[(k.Length + 1)..];
         return result;
     }
 

@@ -148,6 +148,35 @@ public sealed class CrashDumpTests : IDisposable
         Assert.True(root.GetProperty("Dispatcher").GetProperty("Written").GetInt64() >= 1);
     }
 
+    [Fact]
+    public void Write_RedactsSecretsInExceptionAndRecentLogs()
+    {
+        var recent = new[]
+        {
+            new LogEventArgs(
+                LogType.Error,
+                "token=abc123",
+                null,
+                "Member",
+                "file.cs",
+                12)
+        };
+
+        var path = CrashDumpWriter.Write(
+            new InvalidOperationException("password=hunter2"),
+            ExceptionSource.AppDomain,
+            isTerminating: true,
+            Opts(),
+            recent,
+            null);
+
+        var json = File.ReadAllText(path!);
+        Assert.Contains("password=***", json);
+        Assert.Contains("token=***", json);
+        Assert.DoesNotContain("hunter2", json);
+        Assert.DoesNotContain("abc123", json);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_dumpDir))

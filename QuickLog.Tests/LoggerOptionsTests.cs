@@ -102,6 +102,15 @@ public sealed class LoggerOptionsTests : IDisposable
     }
 
     [Fact]
+    public void WithRedaction_CreatesConfigurableRedactionOptions()
+    {
+        var opts = new LoggerOptions().WithRedaction(r => r.SensitiveKeys.Add("session"));
+
+        Assert.NotNull(opts.Redaction);
+        Assert.Contains("session", opts.Redaction.SensitiveKeys);
+    }
+
+    [Fact]
     public void WithFilter_SetsDelegate()
     {
         Func<LogEventArgs, bool> f = _ => true;

@@ -143,6 +143,7 @@ public static class LogManager
             EnableAsyncTraceLogging = options.AsyncTraceLogging,
             Rotation                = options.Rotation,
             AsyncQueueCapacity      = options.AsyncQueueCapacity,
+            Redaction               = options.Redaction,
             Filter                  = options.Filter
         };
         _configured = true;
