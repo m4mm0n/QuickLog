@@ -71,6 +71,9 @@ public sealed class LoggerOptions
     /// <summary>Optional size-based rotation settings for file-backed sinks.</summary>
     public LogRotationOptions? Rotation { get; set; }
 
+    /// <summary>Maximum number of entries buffered by the async dispatcher.</summary>
+    public int AsyncQueueCapacity { get; set; } = 8192;
+
     // ── Filtering ─────────────────────────────────────────────────────────────
 
     /// <summary>Optional predicate applied before dispatching. Return <see langword="false"/> to drop an entry.</summary>
@@ -142,6 +145,13 @@ public sealed class LoggerOptions
             MaxFiles = maxFiles,
             RotateOnStartup = rotateOnStartup
         };
+        return this;
+    }
+
+    /// <summary>Set the async dispatcher queue capacity.</summary>
+    public LoggerOptions WithAsyncQueueCapacity(int capacity)
+    {
+        AsyncQueueCapacity = Math.Max(1, capacity);
         return this;
     }
 

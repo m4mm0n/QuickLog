@@ -59,6 +59,7 @@ public class QuickLogger : IQuickLog, ICloneable
     /// Handles asynchronous log dispatching.
     /// </summary>
     private AsyncLogDispatcher? _asyncDispatcher;
+    private LogDispatcherStats? _lastStats;
 
     /// <summary>
     /// Enables or disables logging to the console.
@@ -154,12 +155,21 @@ public class QuickLogger : IQuickLog, ICloneable
     /// <summary>Optional size-based rotation settings for file-backed async sinks.</summary>
     public LogRotationOptions? Rotation { get; set; }
 
+    /// <summary>Maximum number of entries buffered by the async dispatcher.</summary>
+    public int AsyncQueueCapacity { get; set; } = 8192;
+
     /// <summary>
     /// Returns a snapshot of recent log entries captured by the async memory sink.
     /// Returns an empty list if async logging is disabled.
     /// </summary>
     public IReadOnlyList<LogEventArgs> GetRecentLogs()
         => _memoryLogger?.Snapshot() ?? Array.Empty<LogEventArgs>();
+
+    /// <summary>Returns a snapshot of async dispatcher health counters.</summary>
+    public LogDispatcherStats GetStats()
+        => _asyncDispatcher?.GetStats()
+           ?? _lastStats
+           ?? new LogDispatcherStats(AsyncQueueCapacity, 0, 0, 0, 0, 0, 0, 0, null);
 
     #region Internal Loggers
 
@@ -298,7 +308,7 @@ public class QuickLogger : IQuickLog, ICloneable
         if (EnableAsyncBinaryLogging && !string.IsNullOrWhiteSpace(BinaryLogPath))
             _asyncSinks.Add(new BinaryLogSink(BinaryLogPath, Rotation));
 
-        _asyncDispatcher = new AsyncLogDispatcher(_asyncSinks)
+        _asyncDispatcher = new AsyncLogDispatcher(_asyncSinks, AsyncQueueCapacity)
         {
             DropPolicy    = this.AsyncDropPolicy,
             MinimumLevel  = AsyncMinimumLevel,
@@ -542,6 +552,7 @@ public class QuickLogger : IQuickLog, ICloneable
     public void Shutdown()
     {
         _asyncDispatcher?.Flush();
+        _lastStats = _asyncDispatcher?.GetStats();
         _asyncDispatcher?.Dispose();
         _asyncDispatcher = null;
     }

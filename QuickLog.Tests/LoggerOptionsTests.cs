@@ -94,6 +94,14 @@ public sealed class LoggerOptionsTests : IDisposable
     }
 
     [Fact]
+    public void WithAsyncQueueCapacity_ClampsAndSetsCapacity()
+    {
+        var opts = new LoggerOptions().WithAsyncQueueCapacity(0);
+
+        Assert.Equal(1, opts.AsyncQueueCapacity);
+    }
+
+    [Fact]
     public void WithFilter_SetsDelegate()
     {
         Func<LogEventArgs, bool> f = _ => true;

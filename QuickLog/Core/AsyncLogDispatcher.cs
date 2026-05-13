@@ -33,11 +33,16 @@ namespace QuickLog.Core;
 /// after construction.</remarks>
 internal sealed class AsyncLogDispatcher : IDisposable
 {
-    private readonly BlockingCollection<LogEntry> _queue =
-        new(new ConcurrentQueue<LogEntry>(), 8192);
-
+    private readonly BlockingCollection<LogEntry> _queue;
+    private readonly int _queueCapacity;
     private readonly List<ILogSink> _sinks;
     private readonly Thread _thread;
+    private long _enqueued;
+    private long _written;
+    private long _sinkFailures;
+    private long _inFlight;
+    private long _processed;
+    private string? _lastSinkError;
 
     /// <summary>
     /// Gets or sets the thread role that is protected from being preempted or interrupted.
@@ -71,9 +76,12 @@ internal sealed class AsyncLogDispatcher : IDisposable
     /// entries to the provided sinks. The sinks are used for the lifetime of the dispatcher; changes to the list after
     /// construction do not affect the dispatcher.</remarks>
     /// <param name="sinks">The collection of log sinks that will receive dispatched log entries. Cannot be null or contain null elements.</param>
-    public AsyncLogDispatcher(List<ILogSink> sinks)
+    /// <param name="queueCapacity">The maximum number of entries buffered before drop policies apply.</param>
+    public AsyncLogDispatcher(List<ILogSink> sinks, int queueCapacity = 8192)
     {
         _sinks = sinks;
+        _queueCapacity = Math.Max(1, queueCapacity);
+        _queue = new BlockingCollection<LogEntry>(new ConcurrentQueue<LogEntry>(), _queueCapacity);
 
         _thread = new Thread(Consume)
         {
@@ -91,6 +99,21 @@ internal sealed class AsyncLogDispatcher : IDisposable
         => (DroppedTotal, DroppedByLevel, DroppedByRole);
 
     /// <summary>
+    /// Returns a snapshot of queue, write, drop, and sink-failure counters.
+    /// </summary>
+    public LogDispatcherStats GetStats() =>
+        new(
+            _queueCapacity,
+            _queue.Count,
+            Interlocked.Read(ref _enqueued),
+            Interlocked.Read(ref _written),
+            Interlocked.Read(ref DroppedTotal),
+            Interlocked.Read(ref DroppedByLevel),
+            Interlocked.Read(ref DroppedByRole),
+            Interlocked.Read(ref _sinkFailures),
+            _lastSinkError);
+
+    /// <summary>
     /// Attempts to enqueue a log entry for asynchronous processing, applying the configured drop policy if the queue is
     /// full.
     /// </summary>
@@ -103,7 +126,10 @@ internal sealed class AsyncLogDispatcher : IDisposable
     {
         // Fast path
         if (_queue.TryAdd(entry))
+        {
+            Interlocked.Increment(ref _enqueued);
             return;
+        }
 
         switch (DropPolicy)
         {
@@ -113,7 +139,8 @@ internal sealed class AsyncLogDispatcher : IDisposable
 
             case AsyncDropPolicy.DropOldest:
                 if (_queue.TryTake(out _))
-                    _queue.TryAdd(entry);
+                    if (_queue.TryAdd(entry))
+                        Interlocked.Increment(ref _enqueued);
                 return;
 
             case AsyncDropPolicy.DropBelowLevel:
@@ -125,7 +152,8 @@ internal sealed class AsyncLogDispatcher : IDisposable
                 }
 
                 TrimBelowLevel();
-                _queue.TryAdd(entry);
+                if (_queue.TryAdd(entry))
+                    Interlocked.Increment(ref _enqueued);
                 return;
 
             case AsyncDropPolicy.DropByThreadRole:
@@ -139,7 +167,8 @@ internal sealed class AsyncLogDispatcher : IDisposable
                 {
                     // try to free space by dropping other roles
                     TrimByThreadRole();
-                    _queue.TryAdd(entry);
+                    if (_queue.TryAdd(entry))
+                        Interlocked.Increment(ref _enqueued);
                 }
                 return;
         }
@@ -177,8 +206,28 @@ internal sealed class AsyncLogDispatcher : IDisposable
     {
         foreach (var entry in _queue.GetConsumingEnumerable())
         {
-            foreach (var sink in _sinks)
-                sink.Write(entry);
+            Interlocked.Increment(ref _inFlight);
+            try
+            {
+                foreach (var sink in _sinks)
+                {
+                    try
+                    {
+                        sink.Write(entry);
+                        Interlocked.Increment(ref _written);
+                    }
+                    catch (Exception ex)
+                    {
+                        Interlocked.Increment(ref _sinkFailures);
+                        _lastSinkError = $"{ex.GetType().Name}: {ex.Message}";
+                    }
+                }
+            }
+            finally
+            {
+                Interlocked.Increment(ref _processed);
+                Interlocked.Decrement(ref _inFlight);
+            }
         }
     }
     /// <summary>
@@ -191,7 +240,9 @@ internal sealed class AsyncLogDispatcher : IDisposable
     /// result in undefined behavior.</remarks>
     public void Flush()
     {
-        while (_queue.Count > 0)
+        while (_queue.Count > 0 ||
+               Interlocked.Read(ref _inFlight) > 0 ||
+               Interlocked.Read(ref _processed) < Interlocked.Read(ref _enqueued))
             Thread.Sleep(1);
 
         foreach (var sink in _sinks)
