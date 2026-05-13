@@ -20,11 +20,16 @@ public static class ToolApplication
             ReplayToolCommand command => await ReplayCommand.ExecuteAsync(command, console, cancellationToken),
             BundleToolCommand command => await BundleCommand.ExecuteAsync(command, console, cancellationToken),
             BenchmarkToolCommand command => await BenchmarkCommand.ExecuteAsync(command, console, cancellationToken),
+            LaunchToolCommand command => await LaunchCommand.ExecuteAsync(command, console, cancellationToken),
+            ObserveToolCommand command => await ObserveCommand.ExecuteAsync(command, console, cancellationToken),
+            ProfilerExplainToolCommand command => await ProfilerCommand.ExecuteAsync(command, console, cancellationToken),
+            ProfilerEnvToolCommand command => await ProfilerCommand.ExecuteAsync(command, console, cancellationToken),
             _ => CommandResult.Fail(2)
         };
 
         if (result.ExitCode == 2 && parsed.Command is not (DoctorToolCommand or InspectToolCommand or ReplayToolCommand
-            or BundleToolCommand or BenchmarkToolCommand))
+            or BundleToolCommand or BenchmarkToolCommand or LaunchToolCommand or ObserveToolCommand
+            or ProfilerExplainToolCommand or ProfilerEnvToolCommand))
             console.ErrorLine($"Command not implemented yet: {parsed.Command?.GetType().Name}");
 
         return result.ExitCode;
