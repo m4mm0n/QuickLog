@@ -18,10 +18,13 @@ public static class ToolApplication
             DoctorToolCommand command => await DoctorCommand.ExecuteAsync(command, console, cancellationToken),
             InspectToolCommand command => await InspectCommand.ExecuteAsync(command, console, cancellationToken),
             ReplayToolCommand command => await ReplayCommand.ExecuteAsync(command, console, cancellationToken),
+            BundleToolCommand command => await BundleCommand.ExecuteAsync(command, console, cancellationToken),
+            BenchmarkToolCommand command => await BenchmarkCommand.ExecuteAsync(command, console, cancellationToken),
             _ => CommandResult.Fail(2)
         };
 
-        if (result.ExitCode == 2 && parsed.Command is not (DoctorToolCommand or InspectToolCommand or ReplayToolCommand))
+        if (result.ExitCode == 2 && parsed.Command is not (DoctorToolCommand or InspectToolCommand or ReplayToolCommand
+            or BundleToolCommand or BenchmarkToolCommand))
             console.ErrorLine($"Command not implemented yet: {parsed.Command?.GetType().Name}");
 
         return result.ExitCode;
