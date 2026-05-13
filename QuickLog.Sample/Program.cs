@@ -14,6 +14,9 @@
 using QuickLog;
 using QuickLog.Exceptions;
 using QuickLog.Godot;
+using QuickLog.Utilities;
+
+const string BinaryLogPath = "logs/sample.qlog";
 
 // ── Show restart context ──────────────────────────────────────────────────────
 var restartCount = RestartOptions.CurrentRestartCount;
@@ -26,7 +29,15 @@ if (restartCount > 0)
 }
 
 // ── Configure QuickLog ────────────────────────────────────────────────────────
-LogManager.ConfigureDefault("sample.log");
+LogManager.ConfigureDefault(
+    new LoggerOptions()
+        .WithAsyncOnly()
+        .WithJsonLog("logs/sample.jsonl")
+        .WithBinaryLog(BinaryLogPath)
+        .WithRotation(maxFileBytes: 1024 * 1024, maxFiles: 5)
+        .WithAsyncQueueCapacity(8192)
+        .WithRedaction()
+        .WithSpamControl(duplicateThreshold: 8));
 
 // ── Attach exception hooks ────────────────────────────────────────────────────
 LogManager.AttachExceptionHooks(new ExceptionHookOptions
@@ -67,6 +78,28 @@ var logger = LogManager.GetDefaultLogger();
 
 Console.WriteLine("=== QuickLog Sample ===");
 Console.WriteLine();
+
+using (LogContext.BeginCorrelation($"sample-{Guid.NewGuid():N}"))
+using (LogScope.Begin("SampleStartup"))
+{
+    logger.Log(LogType.Info, "QuickLog sample started with v2.2 async binary logging");
+    logger.Log(LogType.Info, "token=sample-secret api_key=sample-key");
+}
+
+if (logger is QuickLog.Loggers.QuickLogger quickLogger)
+{
+    quickLogger.Flush();
+    var stats = quickLogger.GetStats();
+    var startupEntries = BinaryLogQuery.ContainingText(BinaryLogPath, "v2.2 async binary").Count();
+
+    BinaryLogExporter.ExportToText(BinaryLogPath, "logs/sample.export.log");
+
+    Console.ForegroundColor = ConsoleColor.DarkGray;
+    Console.WriteLine($"  v2.2 dispatcher: written={stats.Written}, dropped={stats.DroppedTotal}, sinkFailures={stats.SinkFailures}");
+    Console.WriteLine($"  v2.2 binary query matches: {startupEntries}");
+    Console.ResetColor();
+    Console.WriteLine();
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Exception demos (same as before)

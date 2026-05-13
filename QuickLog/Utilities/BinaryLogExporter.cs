@@ -55,6 +55,18 @@ public static class BinaryLogExporter
 
             if (!string.IsNullOrWhiteSpace(entry.FilePath))
                 writer.WriteLine($"    at {entry.FilePath}:{entry.LineNumber}");
+
+            if (!string.IsNullOrWhiteSpace(entry.Category))
+                writer.WriteLine($"    scope: {entry.Category}");
+
+            if (!string.IsNullOrWhiteSpace(entry.CorrelationId))
+                writer.WriteLine($"    correlation: {entry.CorrelationId}");
+
+            if (!string.IsNullOrWhiteSpace(entry.TraceId))
+                writer.WriteLine($"    trace: {entry.TraceId}");
+
+            if (!string.IsNullOrWhiteSpace(entry.SpanId))
+                writer.WriteLine($"    span: {entry.SpanId}");
         }
     }
 }

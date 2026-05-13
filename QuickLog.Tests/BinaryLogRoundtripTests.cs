@@ -133,6 +133,53 @@ public sealed class BinaryLogRoundtripTests : IDisposable
         Assert.Equal("span-1", read.SpanId);
     }
 
+    [Fact]
+    public void Query_WithCorrelation_ReturnsMatchingEntries()
+    {
+        using (var sink = new BinaryLogSink(_path))
+        {
+            var first = new LogEntry(DateTime.UtcNow, LogType.Info, "first",
+                "L", null, "M", "f.cs", 1, 1, ThreadRole.Unknown, "corr-a");
+            var second = new LogEntry(DateTime.UtcNow, LogType.Info, "second needle",
+                "L", null, "M", "f.cs", 2, 1, ThreadRole.Unknown, "corr-b");
+            sink.Write(in first);
+            sink.Write(in second);
+        }
+
+        var byCorrelation = BinaryLogQuery.WithCorrelation(_path, "corr-b").Single();
+        var byText = BinaryLogQuery.ContainingText(_path, "needle").Single();
+
+        Assert.Equal("second needle", byCorrelation.Message);
+        Assert.Equal("corr-b", byText.CorrelationId);
+    }
+
+    [Fact]
+    public void ExportToText_IncludesContextFields()
+    {
+        var textPath = Path.Combine(Path.GetTempPath(), $"ql_export_{Guid.NewGuid():N}.txt");
+        try
+        {
+            var entry = new LogEntry(DateTime.UtcNow, LogType.Info, "export context",
+                "L", "ScopeA", "M", "f.cs", 1, 1, ThreadRole.Unknown,
+                "corr-export", "trace-export", "span-export");
+
+            using (var sink = new BinaryLogSink(_path))
+                sink.Write(in entry);
+
+            BinaryLogExporter.ExportToText(_path, textPath);
+            var text = File.ReadAllText(textPath);
+
+            Assert.Contains("ScopeA", text);
+            Assert.Contains("corr-export", text);
+            Assert.Contains("trace-export", text);
+            Assert.Contains("span-export", text);
+        }
+        finally
+        {
+            if (File.Exists(textPath)) File.Delete(textPath);
+        }
+    }
+
     public void Dispose()
     {
         if (File.Exists(_path)) File.Delete(_path);

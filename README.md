@@ -33,7 +33,9 @@ and message-template complexity. What you get instead is **clarity, control, and
 - Caller info via compiler services
 - Exception demystification (stack trace clean-up, zero deps)
 - CRC32 integrity checks
-- Scopes (`LogScope`)
+- Async-flowing scopes (`LogScope`)
+- Correlation ids plus `Activity` trace/span capture (`LogContext`)
+- Built-in sensitive value redaction
 - Thread roles (`ThreadContext`)
 
 ### Sinks
@@ -50,6 +52,8 @@ and message-template complexity. What you get instead is **clarity, control, and
 - Configurable drop policies
 - Severity-aware dropping
 - Thread-role-aware dropping
+- Dispatcher health counters
+- Duplicate message coalescing
 - Async-only mode (no sync IO)
 - Deterministic flush & shutdown
 
@@ -73,7 +77,7 @@ and message-template complexity. What you get instead is **clarity, control, and
 ### Tooling
 - Binary log reader
 - Binary log exporter
-- Binary log query/filtering
+- Binary log query/filtering by level, time, correlation, or text
 - Timeline TUI viewer
 - Colorized output
 - Search + highlighting
@@ -114,6 +118,34 @@ var log = LogManager.GetDefaultLogger();
 
 ---
 
+## v2.2 Engine Mode
+
+```csharp
+LogManager.ConfigureDefault(
+    new LoggerOptions()
+        .WithAsyncOnly()
+        .WithJsonLog("logs/app.jsonl")
+        .WithBinaryLog("logs/app.qlog")
+        .WithRotation(maxFileBytes: 16 * 1024 * 1024, maxFiles: 5)
+        .WithAsyncQueueCapacity(8192)
+        .WithRedaction()
+        .WithSpamControl(duplicateThreshold: 8));
+
+var logger = LogManager.GetDefaultLogger();
+
+using (LogContext.BeginCorrelation(Guid.NewGuid().ToString("N")))
+using (LogScope.Begin("Startup"))
+{
+    logger.Log(LogType.Info, "Game boot sequence started");
+}
+```
+
+This enables the dependency-free v2.2 path: async-only dispatch, JSON Lines,
+CRC-protected binary logs, size-based rotation, redaction, duplicate coalescing,
+and async-safe scope/correlation context.
+
+---
+
 ## Async-Only Mode (Recommended for Engines)
 
 ```csharp
@@ -128,6 +160,21 @@ This ensures:
 - No blocking IO on the game thread
 - No frame hitches
 - Critical logs are never dropped
+
+---
+
+## Dispatcher Health
+
+```csharp
+if (LogManager.GetDefaultLogger() is QuickLog.Loggers.QuickLogger quickLogger)
+{
+    var stats = quickLogger.GetStats();
+    Console.WriteLine($"written={stats.Written} dropped={stats.DroppedTotal}");
+}
+```
+
+The dispatcher tracks queue depth, capacity, written entries, dropped entries,
+sink failures, and the last sink error without adding a metrics dependency.
 
 ---
 
@@ -150,12 +197,31 @@ protect or deprioritize specific roles.
 
 ```csharp
 using (LogScope.Begin("Frame", frameId))
+using (LogContext.BeginCorrelation(matchId))
 {
     logger.Log(LogType.Trace, "Rendering frame");
 }
 ```
 
-Scopes are propagated into async and binary logs.
+Scopes and correlation ids flow through async continuations and are written to
+JSON Lines, binary logs, crash dump log tails, and text exports.
+
+---
+
+## Redaction & Duplicate Control
+
+```csharp
+LogManager.ConfigureDefault(
+    new LoggerOptions()
+        .WithAsyncOnly()
+        .WithBinaryLog("logs/app.qlog")
+        .WithRedaction(options => options.SensitiveKeys.Add("session"))
+        .WithSpamControl(duplicateThreshold: 8));
+```
+
+Redaction masks common secrets before async sinks and crash dumps see them.
+Duplicate control keeps hot repeated messages from flooding disk by emitting a
+summary entry after the threshold is crossed.
 
 ---
 
@@ -237,6 +303,19 @@ Each crash is written as a structured JSON file:
     "MachineName": "WORKSTATION-01",
     "OsVersion": "Microsoft Windows NT 10.0.26200.0",
     "RuntimeVersion": "8.0.22"
+  },
+  "RecentLogs": [
+    {
+      "Level": "Error",
+      "Message": "Lost connection to asset server",
+      "Scope": "Frame:18442",
+      "CorrelationId": "match-7"
+    }
+  ],
+  "Dispatcher": {
+    "Written": 128,
+    "DroppedTotal": 0,
+    "SinkFailures": 0
   }
 }
 ```
@@ -367,12 +446,18 @@ Console.WriteLine(logger.FullPath);
 BinaryLogExporter.ExportToText("quicklog.bin", "recovered.log");
 ```
 
+Text exports include the source location, scope, correlation id, trace id, and
+span id when those fields are present.
+
 ### Query
 
 ```csharp
 var errors = BinaryLogQuery.WithLevel(
     "quicklog.bin",
     LogType.Error | LogType.Crit);
+
+var bootLogs = BinaryLogQuery.ContainingText("quicklog.bin", "boot");
+var matchLogs = BinaryLogQuery.WithCorrelation("quicklog.bin", "match-7");
 ```
 
 ### Timeline Viewer
@@ -430,8 +515,8 @@ MIT
 | Component | Status |
 |---|---|
 | Core logging / sinks | Production-ready |
-| Async pipeline | Production-ready |
-| Binary logs & tooling | Production-ready |
+| Async pipeline | Production-ready (v2.2 health stats) |
+| Binary logs & tooling | Production-ready (v2.2 context-aware format) |
 | Exception ownership | Stable (v2.0) |
-| Crash dump writer | Stable (v2.0) |
+| Crash dump writer | Stable (v2.2 log tail + dispatcher stats) |
 | Godot integration | Experimental (v2.0) |

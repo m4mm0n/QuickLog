@@ -49,6 +49,27 @@ public static class BinaryLogQuery
         BinaryLogReader.Read(path, stopOnCrcError).Where(e => (e.Level & mask) != 0);
 
     /// <summary>
+    /// Enumerates log entries matching the given correlation identifier.
+    /// </summary>
+    public static IEnumerable<LogEntry> WithCorrelation(
+        string path,
+        string correlationId,
+        bool stopOnCrcError = true) =>
+        BinaryLogReader.Read(path, stopOnCrcError)
+            .Where(e => string.Equals(e.CorrelationId, correlationId, StringComparison.Ordinal));
+
+    /// <summary>
+    /// Enumerates log entries whose message contains the given text.
+    /// </summary>
+    public static IEnumerable<LogEntry> ContainingText(
+        string path,
+        string text,
+        StringComparison comparison = StringComparison.OrdinalIgnoreCase,
+        bool stopOnCrcError = true) =>
+        BinaryLogReader.Read(path, stopOnCrcError)
+            .Where(e => e.Message.Contains(text, comparison));
+
+    /// <summary>
     /// Enumerates log entries matching an arbitrary predicate.
     /// </summary>
     public static IEnumerable<LogEntry> Where(
