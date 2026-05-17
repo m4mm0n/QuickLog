@@ -6,10 +6,41 @@ This changelog follows Semantic Versioning and Keep a Changelog style sections.
 
 ## Version Provenance
 
-- `2.2.0` is the current local `v2.2-Exp` development line. It is reflected in package metadata, but it is not tagged or pushed.
+- `2.3.0` is the current local v2.3 lean diagnostics development line. It is reflected in package metadata, but it is not tagged or pushed.
+- `2.2.0` is tagged as `v2.2.0`.
 - `2.1.0` is tagged as `v2.1.0`.
 - `2.0.0` is tagged as `v2.0.0`.
 - Versions before `2.0.0` are retrospective changelog labels. The repository history before `2.0.0` did not record package version metadata or release tags, so those entries describe historical milestones rather than published tags.
+
+## [2.3.0] - 2026-05-17
+
+### Added
+
+- Added lean `LoggerOptions` profiles for engine, service, tool, and Godot-style usage.
+- Added `LoggerOptions.Validate()` with structured validation issues for lossy or contradictory settings.
+- Added startup banners, shutdown summaries, auto session ids, session markers, checkpoints, and bookmarks.
+- Added runtime minimum log level controls and per-sink minimum level overrides.
+- Added dependency-free `[QLOG(...)]` attribute helpers with explicit runner, scope, and discovery APIs.
+- Added `LogOnce`, `LogEvery`, frame hitch markers, and asset load markers for low-noise operational diagnostics.
+- Added crash fingerprints, duplicate fingerprint counts, and crash state snapshots.
+- Added redaction presets for secrets, network values, user-data paths, and crash-safe support output.
+- Added safe log filename and session directory helpers.
+- Added console formatting controls for compact text, ANSI color, and local timestamps.
+- Added QLOG diagnostics, repair, merge, and summary utilities.
+- Added `quicklog tail`, `grep`, `diff`, `stats`, `redact`, `summarize`, `report`, `repair`, `merge`, `timeline`, and `doctor-config`.
+- Added static single-file HTML report generation for offline support bundles.
+- Added README command example parsing tests and runtime project dependency policy tests.
+
+### Changed
+
+- Changed package metadata from `2.2.0` to `2.3.0`.
+- Changed the sample app to demonstrate the v2.3 lean diagnostics path without requiring extra dependencies or destructive exception demos.
+- Changed crash dumps so state snapshot values are redacted before they are written.
+
+### Notes
+
+- QuickLog, QuickLog.Tools, and QuickLog.Sample remain dependency-free at runtime.
+- The new report command writes a static HTML file only; it does not start a server or add a web dashboard runtime.
 
 ## [2.2.0] - 2026-05-13
 

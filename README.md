@@ -15,7 +15,7 @@ and message-template complexity. What you get instead is **clarity, control, and
 ## Install
 
 ```powershell
-dotnet add package ZLS.QuickLog --version 2.2.0
+dotnet add package ZLS.QuickLog --version 2.3.0
 ```
 
 QuickLog targets `net8.0` and `net10.0`, ships with XML documentation, and has
@@ -105,6 +105,9 @@ LogManager.Shutdown();
 - Duplicate message coalescing
 - Async-only mode (no sync IO)
 - Deterministic flush & shutdown
+- Startup banners and shutdown summaries
+- Runtime minimum levels and per-sink thresholds
+- Low-noise helpers: log-once, rate-limited logs, frame hitches, asset markers
 
 ### Exception Ownership *(v2.0)*
 - Hook `AppDomain.UnhandledException` and `TaskScheduler.UnobservedTaskException`
@@ -170,31 +173,115 @@ var log = LogManager.GetDefaultLogger();
 
 ---
 
-## v2.2 Engine Mode
+## v2.3 Lean Engine Setup
 
 ```csharp
+using QuickLog.Core;
+using QuickLog.Loggers;
+
 LogManager.ConfigureDefault(
-    new LoggerOptions()
-        .WithAsyncOnly()
-        .WithJsonLog("logs/app.jsonl")
-        .WithBinaryLog("logs/app.qlog")
-        .WithRotation(maxFileBytes: 16 * 1024 * 1024, maxFiles: 5)
-        .WithAsyncQueueCapacity(8192)
-        .WithRedaction()
-        .WithSpamControl(duplicateThreshold: 8));
+    LoggerOptions.ForEngine("logs")
+        .WithMinimumLevel(LogType.Trace)
+        .WithSinkMinimumLevel("console", LogType.Warn));
 
 var logger = LogManager.GetDefaultLogger();
+var quickLogger = (QuickLogger)logger;
 
 using (LogContext.BeginCorrelation(Guid.NewGuid().ToString("N")))
-using (LogScope.Begin("Startup"))
+using (var session = LogSession.Begin(logger, "startup", quickLogger.SessionId))
 {
     logger.Log(LogType.Info, "Game boot sequence started");
+    quickLogger.LogOnce("renderer.init", LogType.Info, "Renderer initialized");
+    quickLogger.LogEvery("net.retry", TimeSpan.FromSeconds(30), LogType.Warn, "Retrying lobby server");
+    quickLogger.LogFrameTime(42, TimeSpan.FromMilliseconds(18), TimeSpan.FromMilliseconds(16));
+    session.Bookmark("first-frame");
+}
+
+LogManager.Shutdown();
+```
+
+`ForEngine` enables the dependency-free diagnostics path: async-only dispatch,
+JSON Lines, CRC-protected binary logs, size-based rotation, crash-safe redaction,
+duplicate coalescing, a startup banner, a shutdown summary, and an auto-generated
+session id.
+
+Other lean profiles:
+
+```csharp
+var service = LoggerOptions.ForService("logs");
+var tool = LoggerOptions.ForTool("asset-packer");
+var godot = LoggerOptions.ForGodot("user://logs");
+```
+
+Validate options before shipping a preset from config:
+
+```csharp
+var result = LoggerOptions.ForEngine("logs").Validate();
+foreach (var issue in result.Issues)
+    Console.WriteLine($"{issue.Severity} {issue.Code}: {issue.Message}");
+```
+
+---
+
+## Crash State And Fingerprints
+
+```csharp
+LogStateSnapshot.Set("map", "e1m1");
+LogStateSnapshot.Set("phase", "loading");
+
+LogManager.AttachExceptionHooks(new ExceptionHookOptions
+{
+    CrashDump = new CrashDumpOptions
+    {
+        Enabled = true,
+        Redaction = LogRedactionOptions.CrashSafe()
+    }
+});
+```
+
+Crash dumps include a stable fingerprint, a repeat count for duplicate crashes,
+recent log tail, dispatcher stats, and the current state snapshot. State values
+are redacted before they are written.
+
+---
+
+## QLOG Attributes
+
+`[QLOG(...)]` marks classes, constructors, and methods for explicit
+dependency-free instrumentation. QuickLog does not weave IL or create proxies;
+you opt in by running the marked method through `QLogRunner` or by adding one
+scope line inside the method.
+
+```csharp
+public sealed class AssetCompiler
+{
+    [QLOG(LoggingOption.Default)]
+    public void BuildAtlas()
+    {
+        // work
+    }
+}
+
+var compiler = new AssetCompiler();
+QLogRunner.Invoke(logger, compiler.BuildAtlas);
+```
+
+Inside a method, use the scope helper:
+
+```csharp
+[QLOG(QLogOption.Entry | QLogOption.Exit | QLogOption.Timing)]
+public void LoadMap(IQuickLog logger)
+{
+    using var qlog = QLogScope.Enter(logger);
+    // work
 }
 ```
 
-This enables the dependency-free v2.2 path: async-only dispatch, JSON Lines,
-CRC-protected binary logs, size-based rotation, redaction, duplicate coalescing,
-and async-safe scope/correlation context.
+Discovery is also dependency-free:
+
+```csharp
+var markedTargets = QLogDiscovery.Scan(typeof(AssetCompiler).Assembly);
+```
 
 ---
 
@@ -275,6 +362,15 @@ Redaction masks common secrets before async sinks and crash dumps see them.
 Duplicate control keeps hot repeated messages from flooding disk by emitting a
 summary entry after the threshold is crossed.
 
+Built-in presets keep common cases short:
+
+```csharp
+var secrets = LogRedactionOptions.Secrets();
+var network = LogRedactionOptions.Network();
+var userData = LogRedactionOptions.UserData();
+var crashSafe = LogRedactionOptions.CrashSafe();
+```
+
 ---
 
 ## Exception Ownership *(v2.0)*
@@ -340,6 +436,8 @@ Each crash is written as a structured JSON file:
   "Source": "AppDomain",
   "IsTerminating": true,
   "RestartCount": 0,
+  "Fingerprint": "D7C9E3180B4A71C2",
+  "RepeatCount": 1,
   "Exception": {
     "Type": "System.AccessViolationException",
     "Message": "Critical failure: memory corruption detected.",
@@ -368,6 +466,10 @@ Each crash is written as a structured JSON file:
     "Written": 128,
     "DroppedTotal": 0,
     "SinkFailures": 0
+  },
+  "State": {
+    "map": "e1m1",
+    "phase": "loading"
   }
 }
 ```
@@ -518,6 +620,14 @@ var matchLogs = BinaryLogQuery.WithCorrelation("quicklog.bin", "match-7");
 BinaryLogTimelineViewer.Run("quicklog.bin");
 ```
 
+### Summary, merge, and repair
+
+```csharp
+var summary = BinaryLogSummary.FromFile("logs/app.qlog");
+BinaryLogMerge.Merge(["logs/a.qlog", "logs/b.qlog"], "logs/merged.qlog");
+var repair = BinaryLogRepair.Repair("logs/bad.qlog", "logs/fixed.qlog");
+```
+
 Controls:
 ```
 ↑ ↓        Navigate
@@ -533,7 +643,7 @@ Esc        Exit
 
 ---
 
-## QuickLog.Tools *(v2.2 Experimental)*
+## QuickLog.Tools *(v2.3 Lean Diagnostics)*
 
 `QuickLog.Tools` is a zero-external-dependency companion CLI. It references
 QuickLog, uses only the .NET runtime libraries, and keeps the core logger clean.
@@ -541,12 +651,48 @@ QuickLog, uses only the .NET runtime libraries, and keeps the core logger clean.
 Run it from the repo:
 
 ```powershell
+# quicklog-test: parses
 dotnet run --project QuickLog.Tools -- doctor logs --recursive
+# quicklog-test: parses
 dotnet run --project QuickLog.Tools -- inspect logs/app.qlog --level Error --correlation match-7
+# quicklog-test: parses
 dotnet run --project QuickLog.Tools -- replay logs/app.qlog --to jsonl --out logs/app.replay.jsonl
+# quicklog-test: parses
 dotnet run --project QuickLog.Tools -- benchmark --iterations 10000 --mode binary
+# quicklog-test: parses
 dotnet run --project QuickLog.Tools -- bundle --out support.zip --logs logs --crashes crashes --include-env --include-exports
 ```
+
+Lean v2.3 commands:
+
+```powershell
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- tail logs/app.jsonl --lines 20
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- grep error logs --recursive
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- diff logs/old.qlog logs/new.qlog
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- stats logs/app.qlog
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- redact logs/app.log --out logs/app.clean.log
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- summarize logs/app.qlog --out artifacts/quicklog-summary.json
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- report --out artifacts/quicklog-report.html --logs logs --crashes logs/crashes
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- repair logs/bad.qlog --out logs/fixed.qlog
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- merge logs/a.qlog logs/b.qlog --out logs/merged.qlog
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- timeline logs/app.qlog
+# quicklog-test: parses
+dotnet run --project QuickLog.Tools -- doctor-config logger-options.json
+```
+
+`report` writes one static HTML file with inline CSS and no scripts. `repair`
+scans for valid QLOG records and salvages what can be read; it is a recovery
+tool, not a guarantee that every corrupt byte can be reconstructed.
 
 ### Source-less Diagnostics
 
@@ -596,6 +742,8 @@ LogManager.Shutdown();
 
 ## What QuickLog Is NOT
 
+- QuickLog, QuickLog.Tools, and QuickLog.Sample do not carry runtime NuGet package dependencies.
+- The test suite includes a dependency-policy check so this stays visible during release work.
 - Not a DI-based framework
 - Not a message-template logger
 - Not reflection-heavy at runtime
@@ -617,8 +765,8 @@ MIT
 | Component | Status |
 |---|---|
 | Core logging / sinks | Production-ready |
-| Async pipeline | Production-ready (v2.2 health stats) |
-| Binary logs & tooling | Production-ready (v2.2 context-aware format) |
+| Async pipeline | Production-ready (v2.3 low-noise helpers + health stats) |
+| Binary logs & tooling | Production-ready (v2.3 repair/merge/report utilities) |
 | Exception ownership | Stable (v2.0) |
-| Crash dump writer | Stable (v2.2 log tail + dispatcher stats) |
+| Crash dump writer | Stable (v2.3 fingerprints + state snapshots) |
 | Godot integration | Experimental (v2.0) |

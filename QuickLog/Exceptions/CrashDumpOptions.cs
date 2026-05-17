@@ -59,6 +59,21 @@ public sealed class CrashDumpOptions
     public bool IncludeDispatcherStats { get; set; } = true;
 
     /// <summary>
+    /// When <see langword="true"/>, the crash report includes the current <see cref="LogStateSnapshot"/>.
+    /// </summary>
+    public bool IncludeStateSnapshot { get; set; } = true;
+
+    /// <summary>
+    /// When <see langword="true"/>, the crash report includes a stable exception fingerprint.
+    /// </summary>
+    public bool IncludeFingerprint { get; set; } = true;
+
+    /// <summary>
+    /// When <see langword="true"/>, crash reports include the one-based repeat count for the fingerprint.
+    /// </summary>
+    public bool CountDuplicateFingerprints { get; set; } = true;
+
+    /// <summary>
     /// Sensitive value redaction applied to crash report text fields.
     /// </summary>
     public LogRedactionOptions Redaction { get; set; } = new();

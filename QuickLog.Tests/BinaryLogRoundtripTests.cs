@@ -1,3 +1,25 @@
+/*
+ * ====================================================================================================
+ *  Project        : QuickLog
+ *  File           : BinaryLogRoundtripTests.cs
+ *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
+ *  Created        : 2026-05-11 22:17:40 +02:00
+ *  Last Modified  : 2026-05-17 20:35:51 +02:00
+ *  CRC32          : 496DBFF2
+ *  
+ *  Description    :
+ *
+ * 
+ *  License        :
+ *                   MIT
+ *                   https://opensource.org/licenses/MIT
+ *
+ *  Notes          :
+ *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
+ * ====================================================================================================
+ */
+// CRC32-BODY: 496DBFF2
+
 using QuickLog.Core;
 using QuickLog.Sinks;
 using QuickLog.Utilities;

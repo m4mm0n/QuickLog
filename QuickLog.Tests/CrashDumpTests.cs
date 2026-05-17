@@ -1,4 +1,27 @@
+/*
+ * ====================================================================================================
+ *  Project        : QuickLog
+ *  File           : CrashDumpTests.cs
+ *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
+ *  Created        : 2026-05-11 22:17:40 +02:00
+ *  Last Modified  : 2026-05-17 20:35:51 +02:00
+ *  CRC32          : F9AA6351
+ *  
+ *  Description    :
+ *
+ * 
+ *  License        :
+ *                   MIT
+ *                   https://opensource.org/licenses/MIT
+ *
+ *  Notes          :
+ *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
+ * ====================================================================================================
+ */
+// CRC32-BODY: F9AA6351
+
 using System.Text.Json;
+using QuickLog.Core;
 using QuickLog.Exceptions;
 using Xunit;
 
@@ -177,8 +200,71 @@ public sealed class CrashDumpTests : IDisposable
         Assert.DoesNotContain("abc123", json);
     }
 
+    [Fact]
+    public void Write_IncludesFingerprintAndStateSnapshot()
+    {
+        LogStateSnapshot.Clear();
+        LogStateSnapshot.Set("scene", "intro");
+        LogStateSnapshot.Set("player", "42");
+
+        var options = Opts();
+        options.IncludeStateSnapshot = true;
+        options.IncludeFingerprint = true;
+
+        var path = CrashDumpWriter.Write(
+            new InvalidOperationException("boom"),
+            ExceptionSource.AppDomain,
+            isTerminating: true,
+            options);
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(path!));
+        var root = doc.RootElement;
+
+        Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("Fingerprint").GetString()));
+        Assert.Equal("intro", root.GetProperty("State").GetProperty("scene").GetString());
+        Assert.Equal("42", root.GetProperty("State").GetProperty("player").GetString());
+    }
+
+    [Fact]
+    public void Write_CountsDuplicateFingerprints()
+    {
+        var options = Opts();
+        options.IncludeFingerprint = true;
+        options.CountDuplicateFingerprints = true;
+
+        var first = CrashDumpWriter.Write(
+            new InvalidOperationException("same shape"),
+            ExceptionSource.AppDomain,
+            isTerminating: true,
+            options);
+
+        var second = CrashDumpWriter.Write(
+            new InvalidOperationException("same shape"),
+            ExceptionSource.AppDomain,
+            isTerminating: true,
+            options);
+
+        using var firstDoc = JsonDocument.Parse(File.ReadAllText(first!));
+        using var secondDoc = JsonDocument.Parse(File.ReadAllText(second!));
+
+        Assert.Equal(firstDoc.RootElement.GetProperty("Fingerprint").GetString(), secondDoc.RootElement.GetProperty("Fingerprint").GetString());
+        Assert.Equal(1, firstDoc.RootElement.GetProperty("RepeatCount").GetInt32());
+        Assert.Equal(2, secondDoc.RootElement.GetProperty("RepeatCount").GetInt32());
+    }
+
+    [Fact]
+    public void CrashFingerprint_SameExceptionShape_ReturnsSameValue()
+    {
+        var a = CrashFingerprint.From(new InvalidOperationException("boom"));
+        var b = CrashFingerprint.From(new InvalidOperationException("boom"));
+
+        Assert.Equal(a, b);
+    }
+
     public void Dispose()
     {
+        LogStateSnapshot.Clear();
+        CrashFingerprint.ClearCounts();
         if (Directory.Exists(_dumpDir))
             Directory.Delete(_dumpDir, recursive: true);
     }

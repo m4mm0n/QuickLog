@@ -74,6 +74,7 @@ internal static class CrashDumpWriter
     {
         var proc = Process.GetCurrentProcess();
         var redactor = new LogRedactor(opts.Redaction);
+        var fingerprint = opts.IncludeFingerprint ? CrashFingerprint.From(exception) : null;
 
         return new CrashReport
         {
@@ -81,6 +82,10 @@ internal static class CrashDumpWriter
             Source        = source.ToString(),
             IsTerminating = isTerminating,
             RestartCount  = RestartOptions.CurrentRestartCount,
+            Fingerprint   = fingerprint,
+            RepeatCount   = fingerprint is not null && opts.CountDuplicateFingerprints
+                ? CrashFingerprint.IncrementCount(fingerprint)
+                : null,
             Exception     = BuildExceptionInfo(exception, redactor),
             Process       = new ProcessInfo
             {
@@ -105,8 +110,21 @@ internal static class CrashDumpWriter
             RecentLogs = opts.IncludeRecentLogs
                 ? BuildRecentLogs(recentLogs, opts.RecentLogCount, redactor)
                 : null,
-            Dispatcher = opts.IncludeDispatcherStats ? dispatcherStats : null
+            Dispatcher = opts.IncludeDispatcherStats ? dispatcherStats : null,
+            State = opts.IncludeStateSnapshot ? BuildState(redactor) : null
         };
+    }
+
+    private static IReadOnlyDictionary<string, string>? BuildState(LogRedactor redactor)
+    {
+        var snapshot = LogStateSnapshot.Snapshot();
+        if (snapshot.Count == 0)
+            return null;
+
+        return snapshot.ToDictionary(
+            pair => pair.Key,
+            pair => redactor.Redact(pair.Value),
+            StringComparer.Ordinal);
     }
 
     private static List<RecentLogInfo>? BuildRecentLogs(
@@ -190,11 +208,14 @@ internal sealed class CrashReport
     public string         Source        { get; init; } = string.Empty;
     public bool           IsTerminating { get; init; }
     public int            RestartCount  { get; init; }
+    public string?        Fingerprint   { get; init; }
+    public int?           RepeatCount   { get; init; }
     public ExceptionInfo  Exception     { get; init; } = new();
     public ProcessInfo    Process       { get; init; } = new();
     public EnvironmentInfo Environment  { get; init; } = new();
     public List<RecentLogInfo>? RecentLogs { get; init; }
     public LogDispatcherStats? Dispatcher { get; init; }
+    public IReadOnlyDictionary<string, string>? State { get; init; }
 }
 
 internal sealed class ExceptionInfo

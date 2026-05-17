@@ -130,6 +130,127 @@ public sealed class ToolCommandParserTests
     }
 
     [Fact]
+    public void Parse_TailCommand_ReturnsLineAndFollowOptions()
+    {
+        var result = ToolCommandParser.Parse(["tail", "logs/app.jsonl", "--lines", "20", "--follow"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<TailToolCommand>(result.Command);
+        Assert.Equal("logs/app.jsonl", command.Path);
+        Assert.Equal(20, command.Lines);
+        Assert.True(command.Follow);
+    }
+
+    [Fact]
+    public void Parse_GrepCommand_ReturnsPatternPathAndRecursiveOption()
+    {
+        var result = ToolCommandParser.Parse(["grep", "boom", "logs", "--recursive"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<GrepToolCommand>(result.Command);
+        Assert.Equal("boom", command.Pattern);
+        Assert.Equal("logs", command.Path);
+        Assert.True(command.Recursive);
+    }
+
+    [Fact]
+    public void Parse_DiffCommand_ReturnsBothInputs()
+    {
+        var result = ToolCommandParser.Parse(["diff", "old.qlog", "new.qlog"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<DiffToolCommand>(result.Command);
+        Assert.Equal("old.qlog", command.Left);
+        Assert.Equal("new.qlog", command.Right);
+    }
+
+    [Fact]
+    public void Parse_StatsCommand_ReturnsInputPath()
+    {
+        var result = ToolCommandParser.Parse(["stats", "logs/app.qlog"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<StatsToolCommand>(result.Command);
+        Assert.Equal("logs/app.qlog", command.Path);
+    }
+
+    [Fact]
+    public void Parse_RedactCommand_ReturnsInputAndOutput()
+    {
+        var result = ToolCommandParser.Parse(["redact", "input.log", "--out", "clean.log"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<RedactToolCommand>(result.Command);
+        Assert.Equal("input.log", command.Input);
+        Assert.Equal("clean.log", command.Out);
+    }
+
+    [Fact]
+    public void Parse_SummarizeCommand_ReturnsInputAndOutput()
+    {
+        var result = ToolCommandParser.Parse(["summarize", "logs/app.qlog", "--out", "summary.json"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<SummarizeToolCommand>(result.Command);
+        Assert.Equal("logs/app.qlog", command.Path);
+        Assert.Equal("summary.json", command.Out);
+    }
+
+    [Fact]
+    public void Parse_ReportCommand_ReturnsOutputAndInputDirectories()
+    {
+        var result = ToolCommandParser.Parse(["report", "--out", "report.html", "--logs", "logs", "--crashes", "crashes"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<ReportToolCommand>(result.Command);
+        Assert.Equal("report.html", command.Out);
+        Assert.Equal("logs", command.Logs);
+        Assert.Equal("crashes", command.Crashes);
+    }
+
+    [Fact]
+    public void Parse_RepairCommand_ReturnsInputAndOutput()
+    {
+        var result = ToolCommandParser.Parse(["repair", "bad.qlog", "--out", "fixed.qlog"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<RepairToolCommand>(result.Command);
+        Assert.Equal("bad.qlog", command.Path);
+        Assert.Equal("fixed.qlog", command.Out);
+    }
+
+    [Fact]
+    public void Parse_MergeCommand_ReturnsInputsAndOutput()
+    {
+        var result = ToolCommandParser.Parse(["merge", "a.qlog", "b.qlog", "--out", "merged.qlog"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<MergeToolCommand>(result.Command);
+        Assert.Equal(["a.qlog", "b.qlog"], command.Inputs);
+        Assert.Equal("merged.qlog", command.Out);
+    }
+
+    [Fact]
+    public void Parse_TimelineCommand_ReturnsInputPath()
+    {
+        var result = ToolCommandParser.Parse(["timeline", "logs/app.qlog"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<TimelineToolCommand>(result.Command);
+        Assert.Equal("logs/app.qlog", command.Path);
+    }
+
+    [Fact]
+    public void Parse_DoctorConfigCommand_ReturnsConfigPath()
+    {
+        var result = ToolCommandParser.Parse(["doctor-config", "config.json"]);
+
+        Assert.True(result.Success, result.Error);
+        var command = Assert.IsType<DoctorConfigToolCommand>(result.Command);
+        Assert.Equal("config.json", command.Path);
+    }
+
+    [Fact]
     public void Parse_InvalidInput_ReturnsParseError()
     {
         var result = ToolCommandParser.Parse(["launch", "--out", "session"]);

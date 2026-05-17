@@ -46,6 +46,31 @@ public sealed class LogRedactor
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         }
 
-        return result;
+        return _options.RedactUserProfilePaths ? RedactUserPaths(result) : result;
+    }
+
+    private string RedactUserPaths(string value)
+    {
+        var mask = _options.Mask;
+
+        value = Regex.Replace(
+            value,
+            @"(?i)\b([A-Z]:\\Users\\)([^\\\s]+)",
+            $"$1{mask}",
+            RegexOptions.CultureInvariant);
+
+        value = Regex.Replace(
+            value,
+            @"(?i)(/Users/)([^/\s]+)",
+            $"$1{mask}",
+            RegexOptions.CultureInvariant);
+
+        value = Regex.Replace(
+            value,
+            @"(?i)(/home/)([^/\s]+)",
+            $"$1{mask}",
+            RegexOptions.CultureInvariant);
+
+        return value;
     }
 }

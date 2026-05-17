@@ -48,8 +48,42 @@ public sealed record ProfilerExplainToolCommand : ToolCommand;
 
 public sealed record ProfilerEnvToolCommand(Guid Clsid, string Path) : ToolCommand;
 
+/// <summary>Represents a tail command for printing the end of a text log.</summary>
+public sealed record TailToolCommand(string Path, int Lines, bool Follow) : ToolCommand;
+
+/// <summary>Represents a grep command for finding messages across log files.</summary>
+public sealed record GrepToolCommand(string Pattern, string Path, bool Recursive) : ToolCommand;
+
+/// <summary>Represents a diff command for comparing two log files.</summary>
+public sealed record DiffToolCommand(string Left, string Right) : ToolCommand;
+
+/// <summary>Represents a stats command for summarizing one log file.</summary>
+public sealed record StatsToolCommand(string Path) : ToolCommand;
+
+/// <summary>Represents a redact command for writing a masked copy of a text log.</summary>
+public sealed record RedactToolCommand(string Input, string Out) : ToolCommand;
+
+/// <summary>Represents a summarize command for writing a JSON summary of one log file.</summary>
+public sealed record SummarizeToolCommand(string Path, string Out) : ToolCommand;
+
+/// <summary>Represents a report command for writing a static HTML diagnostics report.</summary>
+public sealed record ReportToolCommand(string Out, string? Logs, string? Crashes) : ToolCommand;
+
+/// <summary>Represents a repair command for salvaging readable QLOG records.</summary>
+public sealed record RepairToolCommand(string Path, string Out) : ToolCommand;
+
+/// <summary>Represents a merge command for combining multiple QLOG files.</summary>
+public sealed record MergeToolCommand(IReadOnlyList<string> Inputs, string Out) : ToolCommand;
+
+/// <summary>Represents a timeline command for showing log timing information.</summary>
+public sealed record TimelineToolCommand(string Path) : ToolCommand;
+
+/// <summary>Represents a configuration doctor command for validating serialized logger options.</summary>
+public sealed record DoctorConfigToolCommand(string Path) : ToolCommand;
+
 public static class ToolCommandParser
 {
+    /// <summary>Parses command-line arguments into a typed tool command.</summary>
     public static ToolParseResult Parse(IReadOnlyList<string> args)
     {
         if (args.Count == 0)
@@ -65,6 +99,17 @@ public static class ToolCommandParser
             "launch" => ParseLaunch(args),
             "observe" => ParseObserve(args),
             "profiler" => ParseProfiler(args),
+            "tail" => ParseTail(args),
+            "grep" => ParseGrep(args),
+            "diff" => ParseDiff(args),
+            "stats" => ParseStats(args),
+            "redact" => ParseRedact(args),
+            "summarize" => ParseSummarize(args),
+            "report" => ParseReport(args),
+            "repair" => ParseRepair(args),
+            "merge" => ParseMerge(args),
+            "timeline" => ParseTimeline(args),
+            "doctor-config" => ParseDoctorConfig(args),
             _ => ToolParseResult.Fail($"Unknown command '{args[0]}'.")
         };
     }
@@ -200,6 +245,123 @@ public static class ToolCommandParser
         return ToolParseResult.Ok(new ProfilerEnvToolCommand(clsid, path));
     }
 
+    /// <summary>Parses tail command arguments.</summary>
+    private static ToolParseResult ParseTail(IReadOnlyList<string> args)
+    {
+        var path = FirstPositional(args, 1);
+        if (path is null)
+            return ToolParseResult.Fail("tail requires a path.");
+
+        if (!TryReadOptionalInt(args, "--lines", out var lines, out var error))
+            return ToolParseResult.Fail(error);
+
+        return ToolParseResult.Ok(new TailToolCommand(path, lines ?? 10, Has(args, "--follow")));
+    }
+
+    /// <summary>Parses grep command arguments.</summary>
+    private static ToolParseResult ParseGrep(IReadOnlyList<string> args)
+    {
+        var positionals = Positionals(args, 1);
+        if (positionals.Count < 2)
+            return ToolParseResult.Fail("grep requires a pattern and path.");
+
+        return ToolParseResult.Ok(new GrepToolCommand(positionals[0], positionals[1], Has(args, "--recursive")));
+    }
+
+    /// <summary>Parses diff command arguments.</summary>
+    private static ToolParseResult ParseDiff(IReadOnlyList<string> args)
+    {
+        var positionals = Positionals(args, 1);
+        if (positionals.Count < 2)
+            return ToolParseResult.Fail("diff requires left and right paths.");
+
+        return ToolParseResult.Ok(new DiffToolCommand(positionals[0], positionals[1]));
+    }
+
+    /// <summary>Parses stats command arguments.</summary>
+    private static ToolParseResult ParseStats(IReadOnlyList<string> args)
+    {
+        var path = FirstPositional(args, 1);
+        if (path is null)
+            return ToolParseResult.Fail("stats requires a path.");
+
+        return ToolParseResult.Ok(new StatsToolCommand(path));
+    }
+
+    /// <summary>Parses redact command arguments.</summary>
+    private static ToolParseResult ParseRedact(IReadOnlyList<string> args)
+    {
+        var input = FirstPositional(args, 1);
+        var output = Value(args, "--out");
+        if (input is null || string.IsNullOrWhiteSpace(output))
+            return ToolParseResult.Fail("redact requires <input> --out <output>.");
+
+        return ToolParseResult.Ok(new RedactToolCommand(input, output));
+    }
+
+    /// <summary>Parses summarize command arguments.</summary>
+    private static ToolParseResult ParseSummarize(IReadOnlyList<string> args)
+    {
+        var path = FirstPositional(args, 1);
+        var output = Value(args, "--out");
+        if (path is null || string.IsNullOrWhiteSpace(output))
+            return ToolParseResult.Fail("summarize requires <path> --out <summary.json>.");
+
+        return ToolParseResult.Ok(new SummarizeToolCommand(path, output));
+    }
+
+    /// <summary>Parses report command arguments.</summary>
+    private static ToolParseResult ParseReport(IReadOnlyList<string> args)
+    {
+        var output = Value(args, "--out");
+        if (string.IsNullOrWhiteSpace(output))
+            return ToolParseResult.Fail("report requires --out <report.html>.");
+
+        return ToolParseResult.Ok(new ReportToolCommand(output, Value(args, "--logs"), Value(args, "--crashes")));
+    }
+
+    /// <summary>Parses repair command arguments.</summary>
+    private static ToolParseResult ParseRepair(IReadOnlyList<string> args)
+    {
+        var path = FirstPositional(args, 1);
+        var output = Value(args, "--out");
+        if (path is null || string.IsNullOrWhiteSpace(output))
+            return ToolParseResult.Fail("repair requires <path> --out <fixed.qlog>.");
+
+        return ToolParseResult.Ok(new RepairToolCommand(path, output));
+    }
+
+    /// <summary>Parses merge command arguments.</summary>
+    private static ToolParseResult ParseMerge(IReadOnlyList<string> args)
+    {
+        var inputs = Positionals(args, 1);
+        var output = Value(args, "--out");
+        if (inputs.Count < 2 || string.IsNullOrWhiteSpace(output))
+            return ToolParseResult.Fail("merge requires at least two inputs and --out <merged.qlog>.");
+
+        return ToolParseResult.Ok(new MergeToolCommand(inputs, output));
+    }
+
+    /// <summary>Parses timeline command arguments.</summary>
+    private static ToolParseResult ParseTimeline(IReadOnlyList<string> args)
+    {
+        var path = FirstPositional(args, 1);
+        if (path is null)
+            return ToolParseResult.Fail("timeline requires a path.");
+
+        return ToolParseResult.Ok(new TimelineToolCommand(path));
+    }
+
+    /// <summary>Parses doctor-config command arguments.</summary>
+    private static ToolParseResult ParseDoctorConfig(IReadOnlyList<string> args)
+    {
+        var path = FirstPositional(args, 1);
+        if (path is null)
+            return ToolParseResult.Fail("doctor-config requires a path.");
+
+        return ToolParseResult.Ok(new DoctorConfigToolCommand(path));
+    }
+
     private static string? FirstPositional(IReadOnlyList<string> args, int start)
     {
         for (var i = start; i < args.Count; i++)
@@ -211,6 +373,25 @@ public static class ToolCommandParser
         }
 
         return null;
+    }
+
+    /// <summary>Returns positional arguments while skipping option values.</summary>
+    private static IReadOnlyList<string> Positionals(IReadOnlyList<string> args, int start)
+    {
+        var values = new List<string>();
+        for (var i = start; i < args.Count; i++)
+        {
+            if (args[i].StartsWith("--", StringComparison.Ordinal))
+            {
+                if (i < args.Count - 1 && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                    i++;
+                continue;
+            }
+
+            values.Add(args[i]);
+        }
+
+        return values;
     }
 
     private static bool Has(IReadOnlyList<string> args, string option)

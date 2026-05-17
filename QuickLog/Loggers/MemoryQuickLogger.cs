@@ -41,8 +41,15 @@ public sealed class MemoryQuickLogger : IQuickLog
     private readonly int _capacity;
     private bool _disposed;
 
+    /// <summary>
+    /// Raised whenever an entry is stored in the memory buffer.
+    /// </summary>
     public event EventHandler<LogEventArgs>? LogEvent;
 
+    /// <summary>
+    /// Initializes a new memory logger with a bounded entry buffer.
+    /// </summary>
+    /// <param name="capacity">Maximum number of recent entries to retain.</param>
     public MemoryQuickLogger(int capacity = 1024)
     {
         _capacity = Math.Max(1, capacity);
@@ -86,6 +93,14 @@ public sealed class MemoryQuickLogger : IQuickLog
     // IQuickLog IMPLEMENTATION (EXACT SIGNATURES)
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// Stores a message entry in the in-memory buffer.
+    /// </summary>
+    /// <param name="logType">Severity of the entry.</param>
+    /// <param name="message">Message text.</param>
+    /// <param name="callerName">Compiler-provided caller name.</param>
+    /// <param name="callerFilePath">Compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">Compiler-provided caller line number.</param>
     public void Log(
         LogType logType,
         string message,
@@ -101,6 +116,14 @@ public sealed class MemoryQuickLogger : IQuickLog
             callerLineNumber));
     }
 
+    /// <summary>
+    /// Stores an exception entry in the in-memory buffer.
+    /// </summary>
+    /// <param name="logType">Severity of the entry.</param>
+    /// <param name="exception">Exception to store.</param>
+    /// <param name="callerName">Compiler-provided caller name.</param>
+    /// <param name="callerFilePath">Compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">Compiler-provided caller line number.</param>
     public void Log(
         LogType logType,
         Exception exception,
@@ -116,6 +139,15 @@ public sealed class MemoryQuickLogger : IQuickLog
             callerLineNumber));
     }
 
+    /// <summary>
+    /// Stores a message and exception entry in the in-memory buffer.
+    /// </summary>
+    /// <param name="logType">Severity of the entry.</param>
+    /// <param name="message">Message text.</param>
+    /// <param name="exception">Exception to store.</param>
+    /// <param name="callerName">Compiler-provided caller name.</param>
+    /// <param name="callerFilePath">Compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">Compiler-provided caller line number.</param>
     public void Log(
         LogType logType,
         string message,
@@ -137,6 +169,9 @@ public sealed class MemoryQuickLogger : IQuickLog
     // IDisposable
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// Clears the buffer and prevents additional entries from being stored.
+    /// </summary>
     public void Dispose()
     {
         _disposed = true;

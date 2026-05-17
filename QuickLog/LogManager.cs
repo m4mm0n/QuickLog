@@ -145,9 +145,24 @@ public static class LogManager
             AsyncQueueCapacity      = options.AsyncQueueCapacity,
             Redaction               = options.Redaction,
             SpamControl             = options.SpamControl,
-            Filter                  = options.Filter
+            Filter                  = options.Filter,
+            SessionName             = options.SessionName,
+            SessionId               = options.AutoSessionId ? Guid.NewGuid().ToString("N") : options.SessionName ?? "quicklog",
+            EmitStartupBanner       = options.EmitStartupBanner,
+            EmitShutdownSummary     = options.EmitShutdownSummary,
+            UseAnsiColor            = options.UseAnsiColor,
+            CompactText             = options.CompactText,
+            UseLocalTime            = options.UseLocalTime,
+            MinimumLevel            = options.MinimumLevel
         };
+
+        foreach (var pair in options.SinkMinimumLevels)
+            _defaultLogger.SinkMinimumLevels[pair.Key] = pair.Value;
+
         _configured = true;
+
+        if (_defaultLogger.EmitStartupBanner)
+            _defaultLogger.EmitStartup();
     }
 
     /// <summary>
@@ -192,13 +207,39 @@ public static class LogManager
         if (_configured && _defaultLogger != null)
         {
             // For example, create a logger that logs to a specific file based on the name
-            return new QuickLogger($"{_defaultLogger.LogPath}/{name}.log")
+            var logger = new QuickLogger($"{_defaultLogger.LogPath}/{name}.log")
             {
                 EnableConsoleLogging = _defaultLogger.EnableConsoleLogging,
                 EnableFileLogging = _defaultLogger.EnableFileLogging,
                 EnableEventLogging = _defaultLogger.EnableEventLogging,
-                EnableTraceLogging = _defaultLogger.EnableTraceLogging
+                EnableTraceLogging = _defaultLogger.EnableTraceLogging,
+                EnableAsyncLogging = _defaultLogger.EnableAsyncLogging,
+                EnableAsyncFileLogging = _defaultLogger.EnableAsyncFileLogging,
+                EnableAsyncBinaryLogging = _defaultLogger.EnableAsyncBinaryLogging,
+                AsyncOnly = _defaultLogger.AsyncOnly,
+                BinaryLogPath = _defaultLogger.BinaryLogPath,
+                JsonLogPath = _defaultLogger.JsonLogPath,
+                EnableAsyncTraceLogging = _defaultLogger.EnableAsyncTraceLogging,
+                AsyncDropPolicy = _defaultLogger.AsyncDropPolicy,
+                AsyncMinimumLevel = _defaultLogger.AsyncMinimumLevel,
+                AsyncProtectedRole = _defaultLogger.AsyncProtectedRole,
+                Rotation = _defaultLogger.Rotation,
+                AsyncQueueCapacity = _defaultLogger.AsyncQueueCapacity,
+                Redaction = _defaultLogger.Redaction,
+                SpamControl = _defaultLogger.SpamControl,
+                SessionName = _defaultLogger.SessionName,
+                SessionId = _defaultLogger.SessionId,
+                EmitShutdownSummary = _defaultLogger.EmitShutdownSummary,
+                UseAnsiColor = _defaultLogger.UseAnsiColor,
+                CompactText = _defaultLogger.CompactText,
+                UseLocalTime = _defaultLogger.UseLocalTime,
+                MinimumLevel = _defaultLogger.MinimumLevel
             };
+
+            foreach (var pair in _defaultLogger.SinkMinimumLevels)
+                logger.SinkMinimumLevels[pair.Key] = pair.Value;
+
+            return logger;
         }
 
         // Fallback: create a new logger with generic default settings
@@ -333,7 +374,7 @@ public static class LogManager
     /// Attaches <see cref="ExceptionHookManager"/> to the default logger so that every unhandled
     /// exception is automatically logged and (by default) shown in a modal popup.
     /// <para>
-    /// Call once at application startup, after <see cref="ConfigureDefault()"/> has been called
+    /// Call once at application startup, after the default logger has been configured
     /// (or let this method auto-configure the default logger if needed).
     /// </para>
     /// </summary>

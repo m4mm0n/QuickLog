@@ -1,3 +1,25 @@
+/*
+ * ====================================================================================================
+ *  Project        : QuickLog
+ *  File           : AsyncDispatcherTests.cs
+ *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
+ *  Created        : 2026-05-11 22:17:40 +02:00
+ *  Last Modified  : 2026-05-17 20:35:10 +02:00
+ *  CRC32          : E27DDCA5
+ *  
+ *  Description    :
+ *
+ * 
+ *  License        :
+ *                   MIT
+ *                   https://opensource.org/licenses/MIT
+ *
+ *  Notes          :
+ *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
+ * ====================================================================================================
+ */
+// CRC32-BODY: E27DDCA5
+
 using QuickLog.Loggers;
 using QuickLog.Core;
 using Xunit;

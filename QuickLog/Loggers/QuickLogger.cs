@@ -43,7 +43,7 @@ public class QuickLogger : IQuickLog, ICloneable
     /// <summary>
     /// The path of the log-files - used only internally!
     /// </summary>
-    internal string LogPath { get; private set; }
+    internal string LogPath { get; private set; } = "logs";
 
     /// <summary>
     /// The collection of log sinks where log entries are dispatched.
@@ -61,6 +61,10 @@ public class QuickLogger : IQuickLog, ICloneable
     private AsyncLogDispatcher? _asyncDispatcher;
     private LogDispatcherStats? _lastStats;
     private LogSpamController? _spamController;
+    private LogRateLimiter? _rateLimiter;
+    private readonly DateTime _startedUtc = DateTime.UtcNow;
+    private bool _startupEmitted;
+    private bool _shutdownSummaryEmitted;
 
     /// <summary>
     /// Enables or disables logging to the console.
@@ -165,6 +169,33 @@ public class QuickLogger : IQuickLog, ICloneable
     /// <summary>Optional duplicate coalescing settings for the async path.</summary>
     public LogSpamControlOptions? SpamControl { get; set; }
 
+    /// <summary>Logical session name written in startup and shutdown markers.</summary>
+    public string? SessionName { get; set; }
+
+    /// <summary>Stable identifier for the current logging session.</summary>
+    public string SessionId { get; set; } = Guid.NewGuid().ToString("N");
+
+    /// <summary>Whether <see cref="EmitStartup"/> should be called during option-based configuration.</summary>
+    public bool EmitStartupBanner { get; set; }
+
+    /// <summary>Whether <see cref="Shutdown"/> should write a compact final summary.</summary>
+    public bool EmitShutdownSummary { get; set; }
+
+    /// <summary>Whether console output should include ANSI color escape sequences.</summary>
+    public bool UseAnsiColor { get; set; }
+
+    /// <summary>Whether console output should use compact formatting.</summary>
+    public bool CompactText { get; set; }
+
+    /// <summary>Whether console timestamps should use local time instead of UTC.</summary>
+    public bool UseLocalTime { get; set; }
+
+    /// <summary>Minimum level accepted before entries are dispatched.</summary>
+    public LogType MinimumLevel { get; set; } = LogType.Trace;
+
+    /// <summary>Minimum levels for named sinks such as <c>console</c>, <c>file</c>, or <c>trace</c>.</summary>
+    public Dictionary<string, LogType> SinkMinimumLevels { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Returns a snapshot of recent log entries captured by the async memory sink.
     /// Returns an empty list if async logging is disabled.
@@ -232,6 +263,34 @@ public class QuickLogger : IQuickLog, ICloneable
     /// <param name="sender">The sender of the log event.</param>
     /// <param name="e">The event arguments containing the log details.</param>
     private void RelayLogEvent(object? sender, LogEventArgs e) => LogEvent?.Invoke(this, e);
+
+    private bool ShouldLog(LogType logType) => logType >= MinimumLevel;
+
+    private bool AllowsSink(string sinkName, LogType logType)
+        => !SinkMinimumLevels.TryGetValue(sinkName, out var minimum) || logType >= minimum;
+
+    private void ApplyConsoleOptions()
+    {
+        if (_consoleLogger is null)
+            return;
+
+        _consoleLogger.CompactText = CompactText;
+        _consoleLogger.UseLocalTime = UseLocalTime;
+        _consoleLogger.UseAnsiColor = UseAnsiColor;
+    }
+
+    /// <summary>
+    /// Emits a compact startup banner for the current process and session.
+    /// </summary>
+    public void EmitStartup()
+    {
+        if (_startupEmitted)
+            return;
+
+        _startupEmitted = true;
+        var sessionName = string.IsNullOrWhiteSpace(SessionName) ? "quicklog" : SessionName!;
+        Log(LogType.Info, LogRuntimeSnapshot.Startup(sessionName, SessionId));
+    }
 
     private void Dispatch(LogEventArgs args)
     {
@@ -367,12 +426,16 @@ public class QuickLogger : IQuickLog, ICloneable
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
+        if (!ShouldLog(logType))
+            return;
+
         if (!AsyncOnly)
         {
-            if (EnableConsoleLogging) _consoleLogger?.Log(logType, message, callerName, callerFilePath, callerLineNumber);
-            if (EnableFileLogging && _fileLogger != null) _fileLogger.Log(logType, message, callerName, callerFilePath, callerLineNumber);
-            if (EnableEventLogging) _eventLogger?.Log(logType, message, callerName, callerFilePath, callerLineNumber);
-            if (EnableTraceLogging) _traceLogger?.Log(logType, message, callerName, callerFilePath, callerLineNumber);
+            ApplyConsoleOptions();
+            if (EnableConsoleLogging && AllowsSink("console", logType)) _consoleLogger?.Log(logType, message, callerName, callerFilePath, callerLineNumber);
+            if (EnableFileLogging && _fileLogger != null && AllowsSink("file", logType)) _fileLogger.Log(logType, message, callerName, callerFilePath, callerLineNumber);
+            if (EnableEventLogging && AllowsSink("event", logType)) _eventLogger?.Log(logType, message, callerName, callerFilePath, callerLineNumber);
+            if (EnableTraceLogging && AllowsSink("trace", logType)) _traceLogger?.Log(logType, message, callerName, callerFilePath, callerLineNumber);
         }
         else if (RaiseLogEventInAsyncOnly)
         {
@@ -417,12 +480,16 @@ public class QuickLogger : IQuickLog, ICloneable
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
+        if (!ShouldLog(logType))
+            return;
+
         if (!AsyncOnly)
         {
-            if (EnableConsoleLogging) _consoleLogger?.Log(logType, exception, callerName, callerFilePath, callerLineNumber);
-            if (EnableFileLogging && _fileLogger != null) _fileLogger.Log(logType, exception, callerName, callerFilePath, callerLineNumber);
-            if (EnableEventLogging) _eventLogger?.Log(logType, exception, callerName, callerFilePath, callerLineNumber);
-            if (EnableTraceLogging) _traceLogger?.Log(logType, exception, callerName, callerFilePath, callerLineNumber);
+            ApplyConsoleOptions();
+            if (EnableConsoleLogging && AllowsSink("console", logType)) _consoleLogger?.Log(logType, exception, callerName, callerFilePath, callerLineNumber);
+            if (EnableFileLogging && _fileLogger != null && AllowsSink("file", logType)) _fileLogger.Log(logType, exception, callerName, callerFilePath, callerLineNumber);
+            if (EnableEventLogging && AllowsSink("event", logType)) _eventLogger?.Log(logType, exception, callerName, callerFilePath, callerLineNumber);
+            if (EnableTraceLogging && AllowsSink("trace", logType)) _traceLogger?.Log(logType, exception, callerName, callerFilePath, callerLineNumber);
         }
         else if (RaiseLogEventInAsyncOnly)
         {
@@ -468,12 +535,16 @@ public class QuickLogger : IQuickLog, ICloneable
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
+        if (!ShouldLog(logType))
+            return;
+
         if (!AsyncOnly)
         {
-            if (EnableConsoleLogging) _consoleLogger?.Log(logType, message, exception, callerName, callerFilePath, callerLineNumber);
-            if (EnableFileLogging && _fileLogger != null) _fileLogger.Log(logType, message, exception, callerName, callerFilePath, callerLineNumber);
-            if (EnableEventLogging) _eventLogger?.Log(logType, message, exception, callerName, callerFilePath, callerLineNumber);
-            if (EnableTraceLogging) _traceLogger?.Log(logType, message, exception, callerName, callerFilePath, callerLineNumber);
+            ApplyConsoleOptions();
+            if (EnableConsoleLogging && AllowsSink("console", logType)) _consoleLogger?.Log(logType, message, exception, callerName, callerFilePath, callerLineNumber);
+            if (EnableFileLogging && _fileLogger != null && AllowsSink("file", logType)) _fileLogger.Log(logType, message, exception, callerName, callerFilePath, callerLineNumber);
+            if (EnableEventLogging && AllowsSink("event", logType)) _eventLogger?.Log(logType, message, exception, callerName, callerFilePath, callerLineNumber);
+            if (EnableTraceLogging && AllowsSink("trace", logType)) _traceLogger?.Log(logType, message, exception, callerName, callerFilePath, callerLineNumber);
         }
         else if (RaiseLogEventInAsyncOnly)
         {
@@ -506,6 +577,89 @@ public class QuickLogger : IQuickLog, ICloneable
                 callerLineNumber));
         }
     }
+
+    /// <summary>
+    /// Logs a message only once for a stable caller-supplied key.
+    /// </summary>
+    /// <param name="key">Stable key used to suppress duplicate entries.</param>
+    /// <param name="level">Log level to write when accepted.</param>
+    /// <param name="message">Message to write when accepted.</param>
+    /// <param name="callerName">Compiler-provided caller name.</param>
+    /// <param name="callerFilePath">Compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">Compiler-provided caller line number.</param>
+    public void LogOnce(
+        string key,
+        LogType level,
+        string message,
+        [CallerMemberName] string callerName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        _rateLimiter ??= new LogRateLimiter();
+        if (_rateLimiter.ShouldLogOnce(key))
+            Log(level, message, callerName, callerFilePath, callerLineNumber);
+    }
+
+    /// <summary>
+    /// Logs a message at most once per interval for a stable caller-supplied key.
+    /// </summary>
+    /// <param name="key">Stable key used to rate-limit entries.</param>
+    /// <param name="interval">Minimum time between accepted entries.</param>
+    /// <param name="level">Log level to write when accepted.</param>
+    /// <param name="message">Message to write when accepted.</param>
+    /// <param name="callerName">Compiler-provided caller name.</param>
+    /// <param name="callerFilePath">Compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">Compiler-provided caller line number.</param>
+    public void LogEvery(
+        string key,
+        TimeSpan interval,
+        LogType level,
+        string message,
+        [CallerMemberName] string callerName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        _rateLimiter ??= new LogRateLimiter();
+        if (_rateLimiter.ShouldLogEvery(key, interval))
+            Log(level, message, callerName, callerFilePath, callerLineNumber);
+    }
+
+    /// <summary>
+    /// Logs frame timing and marks frames at or above the hitch threshold as warnings.
+    /// </summary>
+    /// <param name="frame">Frame number.</param>
+    /// <param name="elapsed">Measured frame duration.</param>
+    /// <param name="hitchThreshold">Duration at which the frame becomes a hitch.</param>
+    /// <param name="callerName">Compiler-provided caller name.</param>
+    /// <param name="callerFilePath">Compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">Compiler-provided caller line number.</param>
+    public void LogFrameTime(
+        long frame,
+        TimeSpan elapsed,
+        TimeSpan hitchThreshold,
+        [CallerMemberName] string callerName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        var hitch = elapsed >= hitchThreshold;
+        var label = hitch ? "FRAME HITCH" : "FRAME";
+        var level = hitch ? LogType.Warn : LogType.Trace;
+        Log(level, $"{label} frame={frame} elapsedMs={(long)elapsed.TotalMilliseconds}", callerName, callerFilePath, callerLineNumber);
+    }
+
+    /// <summary>
+    /// Begins an asset-loading marker that writes an end marker when disposed.
+    /// </summary>
+    /// <param name="assetName">Logical asset name.</param>
+    /// <param name="callerName">Compiler-provided caller name.</param>
+    /// <param name="callerFilePath">Compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">Compiler-provided caller line number.</param>
+    public IDisposable BeginAssetLoad(
+        string assetName,
+        [CallerMemberName] string callerName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+        => new AssetLoadMarker(this, assetName, callerName, callerFilePath, callerLineNumber);
 
     /// <summary>
     /// Logs the entry of a method, capturing caller information.
@@ -553,8 +707,37 @@ public class QuickLogger : IQuickLog, ICloneable
             EnableFileLogging = EnableFileLogging,
             EnableEventLogging = EnableEventLogging,
             EnableTraceLogging = EnableTraceLogging,
+            EnableAsyncLogging = EnableAsyncLogging,
+            EnableAsyncFileLogging = EnableAsyncFileLogging,
+            EnableAsyncBinaryLogging = EnableAsyncBinaryLogging,
+            AsyncOnly = AsyncOnly,
+            RaiseLogEventInAsyncOnly = RaiseLogEventInAsyncOnly,
+            Filter = Filter,
+            FileBatchSize = FileBatchSize,
+            AsyncFileBatchSize = AsyncFileBatchSize,
+            BinaryLogPath = BinaryLogPath,
+            JsonLogPath = JsonLogPath,
+            EnableAsyncTraceLogging = EnableAsyncTraceLogging,
+            AsyncDropPolicy = AsyncDropPolicy,
+            AsyncMinimumLevel = AsyncMinimumLevel,
+            AsyncProtectedRole = AsyncProtectedRole,
+            Rotation = Rotation,
+            AsyncQueueCapacity = AsyncQueueCapacity,
+            Redaction = Redaction,
+            SpamControl = SpamControl,
+            SessionName = SessionName,
+            SessionId = SessionId,
+            EmitStartupBanner = EmitStartupBanner,
+            EmitShutdownSummary = EmitShutdownSummary,
+            UseAnsiColor = UseAnsiColor,
+            CompactText = CompactText,
+            UseLocalTime = UseLocalTime,
+            MinimumLevel = MinimumLevel,
             LogPath = LogPath
         };
+        foreach (var pair in SinkMinimumLevels)
+            x.SinkMinimumLevels[pair.Key] = pair.Value;
+
         x.LogEvent = LogEvent;
         x._consoleLogger = _consoleLogger;
         x._eventLogger = _eventLogger;
@@ -593,6 +776,12 @@ public class QuickLogger : IQuickLog, ICloneable
     /// </summary>
     public void Shutdown()
     {
+        if (EmitShutdownSummary && !_shutdownSummaryEmitted)
+        {
+            _shutdownSummaryEmitted = true;
+            Log(LogType.Info, LogRuntimeSnapshot.Shutdown(_startedUtc, GetStats(), SessionId));
+        }
+
         Flush();
         _lastStats = _asyncDispatcher?.GetStats();
         _asyncDispatcher?.Dispose();

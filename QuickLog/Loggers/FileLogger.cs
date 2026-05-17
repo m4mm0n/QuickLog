@@ -132,10 +132,11 @@ public class FileLogger : IQuickLog
     private void CreateDirectoryIfNotExists(string filePath)
     {
         filePath = filePath.ReplaceInvalidPathChars();
+        var directoryName = Path.GetDirectoryName(filePath);
 
-        if (!string.IsNullOrEmpty(Path.GetDirectoryName(filePath)) &&
-            !Directory.Exists(Path.GetDirectoryName(filePath)))
-            Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+        if (!string.IsNullOrEmpty(directoryName) &&
+            !Directory.Exists(directoryName))
+            Directory.CreateDirectory(directoryName);
     }
 
     /// <summary>

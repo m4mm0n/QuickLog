@@ -45,4 +45,16 @@ public sealed class LogRedactionTests
         var entry = logger.GetRecentLogs().Single();
         Assert.Equal("token=*** safe=value", entry.Message);
     }
+
+    [Fact]
+    public void CrashSafePreset_RedactsCommonSecretsAndUserPaths()
+    {
+        var options = LogRedactionOptions.CrashSafe();
+        var redactor = new LogRedactor(options);
+
+        var text = redactor.Redact("api_key=abc C:\\Users\\Alice\\AppData\\Local\\Game");
+
+        Assert.DoesNotContain("abc", text);
+        Assert.DoesNotContain("Alice", text);
+    }
 }

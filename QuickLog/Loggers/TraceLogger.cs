@@ -89,9 +89,10 @@ public class TraceLogger : IQuickLog
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
-        if (new StackTrace().GetFrame(1)?.GetMethod() != null)
+        var method = new StackTrace().GetFrame(1)?.GetMethod();
+        if (method != null)
             Log(LogType.Trace,
-                $"Entering method: {new StackTrace().GetFrame(1)?.GetMethod().DeclaringType?.Name}.{new StackTrace().GetFrame(1)?.GetMethod().Name}",
+                $"Entering method: {method.DeclaringType?.Name}.{method.Name}",
                 callerName,
                 callerFilePath, callerLineNumber);
     }
@@ -108,11 +109,12 @@ public class TraceLogger : IQuickLog
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
-        if (new StackTrace().GetFrame(1)?.GetMethod() != null)
+        var method = new StackTrace().GetFrame(1)?.GetMethod();
+        if (method != null)
         {
             stopwatch.Stop();
             Log(LogType.Trace,
-                $"Exiting method: {new StackTrace().GetFrame(1)?.GetMethod().DeclaringType?.Name}.{new StackTrace().GetFrame(1)?.GetMethod().Name}. Execution time: {stopwatch.ElapsedMilliseconds} ms.",
+                $"Exiting method: {method.DeclaringType?.Name}.{method.Name}. Execution time: {stopwatch.ElapsedMilliseconds} ms.",
                 callerName, callerFilePath, callerLineNumber);
         }
     }

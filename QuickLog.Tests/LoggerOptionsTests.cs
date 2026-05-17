@@ -152,6 +152,32 @@ public sealed class LoggerOptionsTests : IDisposable
         Assert.Equal("app.jsonl", opts.JsonLogPath);
     }
 
+    [Fact]
+    public void ForEngine_ConfiguresAsyncBinaryJsonRotationAndNoiseControl()
+    {
+        var opts = LoggerOptions.ForEngine("logs");
+
+        Assert.False(opts.ConsoleLogging);
+        Assert.True(opts.AsyncLogging);
+        Assert.True(opts.AsyncOnly);
+        Assert.True(opts.AsyncBinaryLogging);
+        Assert.Equal(Path.Combine("logs", "quicklog.qlog"), opts.BinaryLogPath);
+        Assert.Equal(Path.Combine("logs", "quicklog.jsonl"), opts.JsonLogPath);
+        Assert.NotNull(opts.Rotation);
+        Assert.NotNull(opts.Redaction);
+        Assert.NotNull(opts.SpamControl);
+    }
+
+    [Fact]
+    public void ForTool_KeepsConsoleOnAndUsesCompactFormatting()
+    {
+        var opts = LoggerOptions.ForTool("tool");
+
+        Assert.True(opts.ConsoleLogging);
+        Assert.True(opts.CompactText);
+        Assert.Equal("tool", opts.SessionName);
+    }
+
     // ── LogManager.ConfigureDefault(LoggerOptions) ────────────────────────────
 
     [Fact]

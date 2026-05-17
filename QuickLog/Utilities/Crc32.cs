@@ -93,6 +93,9 @@ public class Crc32 : IDisposable
         return ~crc;
     }
 
+    /// <summary>
+    /// Releases resources used by the checksum calculator.
+    /// </summary>
     public void Dispose()
     {
     }

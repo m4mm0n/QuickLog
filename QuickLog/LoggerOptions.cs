@@ -1,4 +1,5 @@
 using QuickLog.Core;
+using QuickLog.Loggers;
 
 namespace QuickLog;
 
@@ -79,6 +80,33 @@ public sealed class LoggerOptions
 
     /// <summary>Optional duplicate coalescing settings for the async path.</summary>
     public LogSpamControlOptions? SpamControl { get; set; }
+
+    /// <summary>Logical session name included in startup/shutdown summaries and session folders.</summary>
+    public string? SessionName { get; set; }
+
+    /// <summary>Whether a session identifier should be generated automatically.</summary>
+    public bool AutoSessionId { get; set; }
+
+    /// <summary>Whether the logger should emit a compact startup banner when configured through <see cref="LogManager"/>.</summary>
+    public bool EmitStartupBanner { get; set; }
+
+    /// <summary>Whether the logger should emit a compact shutdown summary.</summary>
+    public bool EmitShutdownSummary { get; set; }
+
+    /// <summary>Whether console output should include ANSI color escape sequences.</summary>
+    public bool UseAnsiColor { get; set; }
+
+    /// <summary>Whether console output should use compact single-line formatting.</summary>
+    public bool CompactText { get; set; }
+
+    /// <summary>Whether console timestamps should be written in local time instead of UTC.</summary>
+    public bool UseLocalTime { get; set; }
+
+    /// <summary>Minimum level accepted by the logger before dispatching to any sink.</summary>
+    public LogType MinimumLevel { get; set; } = LogType.Trace;
+
+    /// <summary>Per-sink minimum levels keyed by sink name such as <c>console</c>, <c>file</c>, or <c>binary</c>.</summary>
+    public Dictionary<string, LogType> SinkMinimumLevels { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     // ── Filtering ─────────────────────────────────────────────────────────────
 
@@ -182,4 +210,107 @@ public sealed class LoggerOptions
 
     /// <summary>Apply a filter predicate; entries for which the predicate returns <see langword="false"/> are dropped.</summary>
     public LoggerOptions WithFilter(Func<LogEventArgs, bool> filter) { Filter = filter; return this; }
+
+    /// <summary>
+    /// Creates a dependency-free, async-only profile for games, demo engines, and other frame-sensitive apps.
+    /// </summary>
+    /// <param name="logDirectory">Directory where JSON and binary logs should be written.</param>
+    public static LoggerOptions ForEngine(string logDirectory = "logs") => new LoggerOptions()
+        .WithConsole(false)
+        .WithAsyncOnly()
+        .WithJsonLog(CombineLogPath(logDirectory, "quicklog.jsonl"))
+        .WithBinaryLog(CombineLogPath(logDirectory, "quicklog.qlog"))
+        .WithRotation(16 * 1024 * 1024, maxFiles: 5)
+        .WithRedaction(LogRedactionOptions.UseCrashSafePreset)
+        .WithSpamControl(8)
+        .WithSession("engine", autoId: true)
+        .WithStartupBanner()
+        .WithShutdownSummary();
+
+    /// <summary>
+    /// Creates a dependency-free async profile for long-running services.
+    /// </summary>
+    /// <param name="logDirectory">Directory where service logs should be written.</param>
+    public static LoggerOptions ForService(string logDirectory = "logs") => ForEngine(logDirectory)
+        .WithConsole(false)
+        .WithSession("service", autoId: true);
+
+    /// <summary>
+    /// Creates a compact profile for command-line tools.
+    /// </summary>
+    /// <param name="sessionName">Logical tool session name.</param>
+    public static LoggerOptions ForTool(string sessionName = "tool") => new LoggerOptions()
+        .WithConsole()
+        .WithAsync()
+        .WithSession(sessionName, autoId: true)
+        .WithCompactText()
+        .WithAnsiColor();
+
+    /// <summary>
+    /// Creates a dependency-free async profile for Godot projects.
+    /// </summary>
+    /// <param name="logDirectory">Godot-style or filesystem log directory.</param>
+    public static LoggerOptions ForGodot(string logDirectory = "user://logs") => ForEngine(logDirectory)
+        .WithSession("godot", autoId: true);
+
+    /// <summary>
+    /// Sets session metadata used by startup/shutdown summaries.
+    /// </summary>
+    /// <param name="name">Logical session name.</param>
+    /// <param name="autoId">Whether to generate a session identifier automatically.</param>
+    public LoggerOptions WithSession(string? name = null, bool autoId = true)
+    {
+        SessionName = name;
+        AutoSessionId = autoId;
+        return this;
+    }
+
+    /// <summary>Enables or disables startup banner emission.</summary>
+    public LoggerOptions WithStartupBanner(bool enabled = true) { EmitStartupBanner = enabled; return this; }
+
+    /// <summary>Enables or disables shutdown summary emission.</summary>
+    public LoggerOptions WithShutdownSummary(bool enabled = true) { EmitShutdownSummary = enabled; return this; }
+
+    /// <summary>Enables or disables ANSI color in console output.</summary>
+    public LoggerOptions WithAnsiColor(bool enabled = true) { UseAnsiColor = enabled; return this; }
+
+    /// <summary>Enables or disables compact console text formatting.</summary>
+    public LoggerOptions WithCompactText(bool enabled = true) { CompactText = enabled; return this; }
+
+    /// <summary>Uses local-time console timestamps when enabled.</summary>
+    public LoggerOptions WithLocalTime(bool enabled = true) { UseLocalTime = enabled; return this; }
+
+    /// <summary>Sets the global minimum log level.</summary>
+    public LoggerOptions WithMinimumLevel(LogType level) { MinimumLevel = level; return this; }
+
+    /// <summary>Sets the minimum level for a named sink.</summary>
+    public LoggerOptions WithSinkMinimumLevel(string sink, LogType level)
+    {
+        SinkMinimumLevels[sink] = level;
+        return this;
+    }
+
+    /// <summary>
+    /// Validates the option set for contradictory or lossy settings.
+    /// </summary>
+    public LoggerOptionsValidationResult Validate()
+    {
+        var issues = new List<LoggerOptionsIssue>();
+
+        if (AsyncOnly && !AsyncLogging)
+            issues.Add(new("QL001", "AsyncOnly requires AsyncLogging.", LoggerOptionsIssueSeverity.Error));
+
+        if (AsyncOnly && string.IsNullOrWhiteSpace(JsonLogPath) && !AsyncBinaryLogging && !AsyncTraceLogging)
+            issues.Add(new("QL001", "AsyncOnly should have at least one durable async sink.", LoggerOptionsIssueSeverity.Error));
+
+        if (Rotation is not null && (Rotation.MaxFileBytes <= 0 || Rotation.MaxFiles <= 0))
+            issues.Add(new("QL002", "Rotation requires MaxFileBytes and MaxFiles greater than zero.", LoggerOptionsIssueSeverity.Error));
+
+        return new LoggerOptionsValidationResult(issues);
+    }
+
+    private static string CombineLogPath(string directory, string fileName)
+        => directory.Contains("://", StringComparison.Ordinal)
+            ? $"{directory.TrimEnd('/', '\\')}/{fileName}"
+            : Path.Combine(directory, fileName);
 }

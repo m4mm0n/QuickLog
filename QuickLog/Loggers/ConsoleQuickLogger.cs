@@ -32,6 +32,21 @@ namespace QuickLog.Loggers;
 public class ConsoleQuickLogger : IQuickLog
 {
     /// <summary>
+    /// Gets or sets whether console output should use compact formatting.
+    /// </summary>
+    public bool CompactText { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether timestamps should be converted to local time.
+    /// </summary>
+    public bool UseLocalTime { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether ANSI color escape sequences should be emitted.
+    /// </summary>
+    public bool UseAnsiColor { get; set; }
+
+    /// <summary>
     /// Occurs when a log event is triggered.
     /// </summary>
     public event EventHandler<LogEventArgs>? LogEvent;
@@ -91,8 +106,22 @@ public class ConsoleQuickLogger : IQuickLog
         // Trigger the log event for any listeners
         LogEvent?.Invoke(this, logEventArgs);
 
-        // Write to the console
-        Console.WriteLine(logEventArgs.ToString());
+        var entry = new QuickLog.Core.LogEntry(
+            DateTime.UtcNow,
+            logEventArgs.LoggingType,
+            logEventArgs.Exception is null ? logEventArgs.Message ?? string.Empty : logEventArgs.Exception.ToString(),
+            "Console",
+            logEventArgs.Scope,
+            logEventArgs.CallerName,
+            logEventArgs.CallerFilePath,
+            logEventArgs.CallerLineNumber,
+            Environment.CurrentManagedThreadId,
+            QuickLog.Core.ThreadContext.Role,
+            logEventArgs.CorrelationId,
+            logEventArgs.TraceId,
+            logEventArgs.SpanId);
+
+        Console.WriteLine(QuickLog.Sinks.ConsoleLogFormatter.Format(entry, CompactText, UseLocalTime, UseAnsiColor));
     }
     /// <summary>
     /// Disposes of the ConsoleQuickLogger instance.
