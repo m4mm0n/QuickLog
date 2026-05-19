@@ -275,7 +275,7 @@ public static class LogManager
         string subfolder = "logs",
         string? fallbackRoot = null)
     {
-        fileName = fileName.ReplaceInvalidChars(); // uses your Extensions helper
+        fileName = GodotUserPathResolver.NormalizeLogFileName(fileName, "application.log");
 
         var baseDir = GodotUserPathResolver.GetUserDir(fallbackRoot);
         var targetDir = string.IsNullOrWhiteSpace(subfolder) ? baseDir : Path.Combine(baseDir, subfolder);
@@ -321,7 +321,7 @@ public static class LogManager
             var targetDir = string.IsNullOrWhiteSpace(subfolder) ? baseDir : Path.Combine(baseDir, subfolder);
             Directory.CreateDirectory(targetDir);
 
-            var fn = (fileName ?? $"{name}.log").ReplaceInvalidChars();
+            var fn = GodotUserPathResolver.NormalizeLogFileName(fileName ?? $"{name}.log", "godot.log");
             var fullPath = Path.Combine(targetDir, fn);
 
             return new QuickLogger(fullPath)

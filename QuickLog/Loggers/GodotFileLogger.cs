@@ -75,8 +75,7 @@ public sealed class GodotFileLogger : IQuickLog
     /// </param>
     public GodotFileLogger(string fileName = "game.log", string subfolder = "logs", string? fallbackRoot = null)
     {
-        // Sanitize filename using your internal Extensions helper.
-        fileName = fileName.ReplaceInvalidChars();
+        fileName = GodotUserPathResolver.NormalizeLogFileName(fileName, "game.log");
 
         var looksLikeGodot = GodotUserPathResolver.IsGodotRuntime();
         var baseDir = GodotUserPathResolver.GetUserDir(fallbackRoot);

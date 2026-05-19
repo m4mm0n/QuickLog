@@ -43,6 +43,7 @@ namespace QuickLog.Godot;
 public static class GodotLogInterceptor
 {
     private static bool _attached;
+    private static bool _exceptionHooksAttached;
     private static object? _dynamicSinkInstance;
     private static MethodInfo? _removeLoggerMethod;
     private static readonly object _lock = new();
@@ -54,11 +55,7 @@ public static class GodotLogInterceptor
     /// Whether the current process appears to be running inside the Godot runtime.
     /// Checks for loaded assemblies whose names start with <c>"Godot"</c>.
     /// </summary>
-    public static bool IsGodotPresent =>
-        AppDomain.CurrentDomain.GetAssemblies()
-            .Select(a => a.GetName().Name)
-            .Any(n => !string.IsNullOrEmpty(n) &&
-                      n.StartsWith("Godot", StringComparison.OrdinalIgnoreCase));
+    public static bool IsGodotPresent => GodotReflection.IsRuntimePresent();
 
     /// <summary>
     /// Whether the dynamic <c>Godot.Logger</c> subclass was created and registered via
@@ -100,8 +97,9 @@ public static class GodotLogInterceptor
             // 1. Configure the static bridge (always succeeds).
             GodotBridge.Configure(logger, options);
 
-            // 2. Attempt dynamic OS.AddLogger registration (best effort).
-            if (!_attached && options.TryDynamicLoggerRegistration)
+            // 2. Attempt dynamic OS.AddLogger registration (best effort). Retry if a
+            // previous attach happened before Godot types were available.
+            if (options.TryDynamicLoggerRegistration && _dynamicSinkInstance == null)
                 TryRegisterDynamicSink();
 
             // 3. Attach exception hooks with Godot-native popup.
@@ -109,6 +107,12 @@ public static class GodotLogInterceptor
             {
                 var exOpts = options.ExceptionOptions ?? BuildDefaultExceptionOptions();
                 ExceptionHookManager.Attach(logger, exOpts);
+                _exceptionHooksAttached = true;
+            }
+            else if (_exceptionHooksAttached)
+            {
+                ExceptionHookManager.Detach();
+                _exceptionHooksAttached = false;
             }
 
             _attached = true;
@@ -128,7 +132,9 @@ public static class GodotLogInterceptor
 
             TryUnregisterDynamicSink();
             GodotBridge.Clear();
-            ExceptionHookManager.Detach();
+            if (_exceptionHooksAttached)
+                ExceptionHookManager.Detach();
+            _exceptionHooksAttached = false;
             _attached = false;
         }
     }
@@ -141,16 +147,13 @@ public static class GodotLogInterceptor
     {
         try
         {
-            // Resolve Godot.Logger type from any loaded GodotSharp assembly.
-            var loggerType = Type.GetType("Godot.Logger, GodotSharp")
-                          ?? Type.GetType("Godot.Logger");
+            // Resolve Godot.Logger type from any loaded Godot assembly.
+            var loggerType = GodotReflection.ResolveType("Godot.Logger");
             if (loggerType == null) return;
 
             // Find the two virtual methods we need to override.
-            var logMessageMethod = loggerType.GetMethod("_LogMessage",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            var logErrorMethod = loggerType.GetMethod("_LogError",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var logMessageMethod = FindLogMessageMethod(loggerType);
+            var logErrorMethod = FindLogErrorMethod(loggerType);
             if (logMessageMethod == null || logErrorMethod == null) return;
 
             // Emit the dynamic subclass.
@@ -161,7 +164,7 @@ public static class GodotLogInterceptor
             var sinkInstance = Activator.CreateInstance(sinkType);
             if (sinkInstance == null) return;
 
-            var osType = Type.GetType("Godot.OS, GodotSharp") ?? Type.GetType("Godot.OS");
+            var osType = GodotReflection.ResolveType("Godot.OS");
             var addLogger = osType?.GetMethod("AddLogger",
                 BindingFlags.Public | BindingFlags.Static,
                 binder: null, types: [loggerType], modifiers: null);
@@ -177,6 +180,35 @@ public static class GodotLogInterceptor
         }
         catch { /* dynamic registration is best-effort — swallow all failures */ }
     }
+
+    private static MethodInfo? FindLogMessageMethod(Type loggerType) =>
+        loggerType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .FirstOrDefault(m =>
+            {
+                if (m.Name != "_LogMessage" || !m.IsVirtual || m.ReturnType != typeof(void))
+                    return false;
+
+                var p = m.GetParameters();
+                return p.Length >= 2 &&
+                       p[0].ParameterType == typeof(string) &&
+                       p[1].ParameterType == typeof(bool);
+            });
+
+    private static MethodInfo? FindLogErrorMethod(Type loggerType) =>
+        loggerType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .FirstOrDefault(m =>
+            {
+                if (m.Name != "_LogError" || !m.IsVirtual || m.ReturnType != typeof(void))
+                    return false;
+
+                var p = m.GetParameters();
+                return p.Length >= 7 &&
+                       p[0].ParameterType == typeof(string) &&
+                       p[1].ParameterType == typeof(string) &&
+                       p[2].ParameterType == typeof(int) &&
+                       p[3].ParameterType == typeof(string) &&
+                       p[4].ParameterType == typeof(string);
+            });
 
     private static void TryUnregisterDynamicSink()
     {
@@ -210,22 +242,24 @@ public static class GodotLogInterceptor
                 TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed,
                 loggerBase);
 
-            EmitLogMessage(typeBuilder, logMessageMethod);
-            EmitLogError(typeBuilder, logErrorMethod);
+            if (!EmitLogMessage(typeBuilder, logMessageMethod))
+                return null;
+            if (!EmitLogError(typeBuilder, logErrorMethod))
+                return null;
 
             return typeBuilder.CreateType();
         }
         catch { return null; }
     }
 
-    private static void EmitLogMessage(TypeBuilder tb, MethodInfo baseMethod)
+    private static bool EmitLogMessage(TypeBuilder tb, MethodInfo baseMethod)
     {
         // _LogMessage(string message, bool error)
         var paramTypes = baseMethod.GetParameters().Select(p => p.ParameterType).ToArray();
 
         var method = tb.DefineMethod(
             "_LogMessage",
-            MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
+            GetOverrideAttributes(baseMethod),
             typeof(void), paramTypes);
 
         // GodotBridge.HandleMessage(string, bool) static method
@@ -240,17 +274,22 @@ public static class GodotLogInterceptor
         il.Emit(OpCodes.Ret);
 
         tb.DefineMethodOverride(method, baseMethod);
+        return true;
     }
 
-    private static void EmitLogError(TypeBuilder tb, MethodInfo baseMethod)
+    private static bool EmitLogError(TypeBuilder tb, MethodInfo baseMethod)
     {
         // _LogError(string function, string file, int line, string code, string rationale,
         //           bool errorType, int errorTypeValue, Array<ScriptBacktrace> scriptBacktraces)
-        var paramTypes = baseMethod.GetParameters().Select(p => p.ParameterType).ToArray();
+        var parameters = baseMethod.GetParameters();
+        var paramTypes = parameters.Select(p => p.ParameterType).ToArray();
+        var errorTypeParameterIndex = FindErrorTypeParameterIndex(parameters);
+        if (errorTypeParameterIndex < 0)
+            return false;
 
         var method = tb.DefineMethod(
             "_LogError",
-            MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
+            GetOverrideAttributes(baseMethod),
             typeof(void), paramTypes);
 
         // GodotBridge.HandleError(string, string, int, string, string, int) — we skip the last param
@@ -264,11 +303,44 @@ public static class GodotLogInterceptor
         il.Emit(OpCodes.Ldarg_3); // line           (int)
         il.Emit(OpCodes.Ldarg_S, (byte)4); // code      (string)
         il.Emit(OpCodes.Ldarg_S, (byte)5); // rationale (string)
-        il.Emit(OpCodes.Ldarg_S, (byte)7); // errorTypeValue (int) — arg 6 is bool errorType, 7 is int
+        il.Emit(OpCodes.Ldarg_S, (byte)(errorTypeParameterIndex + 1));
+        il.Emit(OpCodes.Conv_I4);
         il.Emit(OpCodes.Call, handleError);
         il.Emit(OpCodes.Ret);
 
         tb.DefineMethodOverride(method, baseMethod);
+        return true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  IL helper methods
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static MethodAttributes GetOverrideAttributes(MethodInfo baseMethod)
+    {
+        var visibility =
+            baseMethod.IsPublic ? MethodAttributes.Public :
+            baseMethod.IsFamily ? MethodAttributes.Family :
+            baseMethod.IsFamilyOrAssembly ? MethodAttributes.FamORAssem :
+            baseMethod.IsAssembly ? MethodAttributes.Assembly :
+            MethodAttributes.Private;
+
+        return visibility | MethodAttributes.Virtual | MethodAttributes.HideBySig;
+    }
+
+    private static int FindErrorTypeParameterIndex(ParameterInfo[] parameters)
+    {
+        for (var i = 5; i < parameters.Length; i++)
+        {
+            var parameter = parameters[i];
+            if (parameter.ParameterType == typeof(bool))
+                continue;
+
+            if (parameter.ParameterType == typeof(int) || parameter.ParameterType.IsEnum)
+                return i;
+        }
+
+        return -1;
     }
 
     // ─────────────────────────────────────────────────────────────────────────

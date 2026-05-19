@@ -7,10 +7,10 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
     <PackageId>ZLS.QuickLog</PackageId>
-    <Version>2.3.0</Version>
-    <AssemblyVersion>2.3.0.0</AssemblyVersion>
-    <FileVersion>2.3.0.0</FileVersion>
-    <PackageVersion>2.3.0</PackageVersion>
+    <Version>2.3.1</Version>
+    <AssemblyVersion>2.3.1.0</AssemblyVersion>
+    <FileVersion>2.3.1.0</FileVersion>
+    <PackageVersion>2.3.1</PackageVersion>
 
     <Product>QuickLog</Product>
     <Company>ZeroLinez Softworx</Company>
@@ -22,7 +22,7 @@
     <PackageProjectUrl>https://github.com/m4mm0n/QuickLog</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>QuickLog v2.3 adds lean diagnostics UX: profiles, validation, session markers, QLOG attribute helpers, low-noise helpers, crash fingerprints/state, qlog repair/merge/summary utilities, and static report tooling with no new runtime dependencies.</PackageReleaseNotes>
+    <PackageReleaseNotes>QuickLog v2.3.1 hardens the Godot integration with loaded-assembly reflection, retryable dynamic logger registration, Godot-owned exception hook cleanup, safe Godot log filenames, and focused regression coverage. Zero runtime dependencies.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

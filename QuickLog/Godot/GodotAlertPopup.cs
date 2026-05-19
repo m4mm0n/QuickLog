@@ -10,6 +10,7 @@
 
 using System.Reflection;
 using QuickLog.Exceptions;
+using QuickLog.Utilities;
 
 namespace QuickLog.Godot;
 
@@ -21,13 +22,14 @@ namespace QuickLog.Godot;
 /// </summary>
 public sealed class GodotAlertPopup : IExceptionPopup
 {
-    private static readonly Lazy<MethodInfo?> _alertMethod = new(ResolveAlertMethod);
+    private static readonly object _lock = new();
+    private static MethodInfo? _alertMethod;
     private static readonly DefaultExceptionPopup _fallback = new();
 
     /// <inheritdoc/>
     public void Show(string title, string message, Exception exception, ExceptionSource source)
     {
-        var mi = _alertMethod.Value;
+        var mi = GetAlertMethod();
         if (mi != null)
         {
             try
@@ -42,16 +44,23 @@ public sealed class GodotAlertPopup : IExceptionPopup
         _fallback.Show(title, message, exception, source);
     }
 
+    private static MethodInfo? GetAlertMethod()
+    {
+        lock (_lock)
+        {
+            _alertMethod ??= ResolveAlertMethod();
+            return _alertMethod;
+        }
+    }
+
     private static MethodInfo? ResolveAlertMethod()
     {
         try
         {
-            var osType = Type.GetType("Godot.OS, GodotSharp") ?? Type.GetType("Godot.OS");
-            return osType?.GetMethod("Alert",
-                BindingFlags.Public | BindingFlags.Static,
-                binder: null,
-                types: [typeof(string), typeof(string)],
-                modifiers: null);
+            return GodotReflection.ResolveStaticMethod(
+                "Godot.OS",
+                "Alert",
+                [typeof(string), typeof(string)]);
         }
         catch { return null; }
     }

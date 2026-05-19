@@ -22,8 +22,6 @@
  */
 // CRC32-BODY: 17D7F77E
 
-using System.Reflection;
-
 namespace QuickLog.Utilities;
 
 /// <summary>
@@ -37,9 +35,7 @@ internal static class GodotUserPathResolver
     /// Returns true if the current process appears to be running under the Godot runtime.
     /// Heuristic: checks loaded assemblies for names starting with "Godot".
     /// </summary>
-    public static bool IsGodotRuntime() =>
-        AppDomain.CurrentDomain.GetAssemblies().Select(asm => asm.GetName().Name).Any(n =>
-            !string.IsNullOrEmpty(n) && n.StartsWith("Godot", StringComparison.OrdinalIgnoreCase));
+    public static bool IsGodotRuntime() => GodotReflection.IsRuntimePresent();
 
     /// <summary>
     /// Tries to resolve an absolute path for Godot's user:// folder.
@@ -56,11 +52,10 @@ internal static class GodotUserPathResolver
         {
             try
             {
-                // Try both typical type names; the assembly-qualified name may vary by setup.
-                var t = Type.GetType("Godot.ProjectSettings, GodotSharp")
-                        ?? Type.GetType("Godot.ProjectSettings");
-                var mi = t?.GetMethod("GlobalizePath", BindingFlags.Public | BindingFlags.Static,
-                                      binder: null, types: new[] { typeof(string) }, modifiers: null);
+                var mi = GodotReflection.ResolveStaticMethod(
+                    "Godot.ProjectSettings",
+                    "GlobalizePath",
+                    [typeof(string)]);
                 if (mi != null)
                 {
                     var abs = mi.Invoke(null, new object[] { "user://" }) as string;
@@ -79,6 +74,20 @@ internal static class GodotUserPathResolver
             return fallbackRoot;
 
         var localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(localApp))
+            localApp = AppContext.BaseDirectory;
+
         return Path.Combine(localApp, "GodotUser");
+    }
+
+    public static string NormalizeLogFileName(string? fileName, string fallback)
+    {
+        var sanitized = string.IsNullOrWhiteSpace(fileName)
+            ? string.Empty
+            : fileName.ReplaceInvalidChars();
+
+        return string.IsNullOrWhiteSpace(sanitized)
+            ? fallback
+            : sanitized;
     }
 }

@@ -6,11 +6,31 @@ This changelog follows Semantic Versioning and Keep a Changelog style sections.
 
 ## Version Provenance
 
-- `2.3.0` is the current local v2.3 lean diagnostics development line. It is reflected in package metadata, but it is not tagged or pushed.
+- `2.3.1` is the current Godot hardening release line.
+- `2.3.0` is tagged as `v2.3.0`.
 - `2.2.0` is tagged as `v2.2.0`.
 - `2.1.0` is tagged as `v2.1.0`.
 - `2.0.0` is tagged as `v2.0.0`.
 - Versions before `2.0.0` are retrospective changelog labels. The repository history before `2.0.0` did not record package version metadata or release tags, so those entries describe historical milestones rather than published tags.
+
+## [2.3.1] - 2026-05-19
+
+### Fixed
+
+- Fixed Godot runtime type resolution so optional Godot types are found from already loaded assemblies, not only hard-coded assembly-qualified names.
+- Fixed dynamic `Godot.Logger` registration so a later attach can retry registration if the first attach ran before Godot types were available or disabled dynamic registration.
+- Fixed Godot-owned exception hook lifecycle so reattaching with `HijackExceptions = false` detaches hooks previously attached by `GodotLogInterceptor`.
+- Fixed dynamic logger IL emission to tolerate Godot `ErrorType` enum parameters and preserve base method visibility.
+- Fixed `GodotFileLogger`, `ConfigureDefaultGodotLogger`, and `GetGodotLogger` to use safe default filenames when sanitization removes every character.
+
+### Added
+
+- Added focused Godot regression tests for loaded-assembly path resolution, dynamic logger routing, exception hook ownership, and safe filename fallback.
+
+### Changed
+
+- Changed package metadata from `2.3.0` to `2.3.1`.
+- Changed NuGet release notes to describe the Godot hardening release.
 
 ## [2.3.0] - 2026-05-17
 

@@ -15,7 +15,7 @@ and message-template complexity. What you get instead is **clarity, control, and
 ## Install
 
 ```powershell
-dotnet add package ZLS.QuickLog --version 2.3.0
+dotnet add package ZLS.QuickLog --version 2.3.1
 ```
 
 QuickLog targets `net8.0` and `net10.0`, ships with XML documentation, and has
@@ -769,4 +769,4 @@ MIT
 | Binary logs & tooling | Production-ready (v2.3 repair/merge/report utilities) |
 | Exception ownership | Stable (v2.0) |
 | Crash dump writer | Stable (v2.3 fingerprints + state snapshots) |
-| Godot integration | Experimental (v2.0) |
+| Godot integration | Stable bridge and file logging; dynamic engine sink is best-effort with manual bridge fallback |
