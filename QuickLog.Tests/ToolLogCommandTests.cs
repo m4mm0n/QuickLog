@@ -31,6 +31,46 @@ public sealed class ToolLogCommandTests : IDisposable
         Assert.Contains("Info: 1", console.OutputText);
     }
 
+    /// <summary>
+    /// Verifies that doctor can inspect an actively written JSON Lines log without crashing on Windows file sharing.
+    /// </summary>
+    [Fact]
+    public async Task Doctor_ReadsJsonLinesLogWhileWriterKeepsFileOpen()
+    {
+        var path = Path.Combine(_dir, "active.jsonl");
+        await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+        await using var writer = new StreamWriter(stream);
+        await writer.WriteLineAsync("{\"ts\":\"2026-01-01T00:00:00.0000000Z\",\"level\":\"Info\",\"msg\":\"active\"}");
+        await writer.FlushAsync();
+        var console = new BufferToolConsole();
+
+        var result = await DoctorCommand.ExecuteAsync(new DoctorToolCommand(path, Recursive: false), console);
+
+        Assert.True(result.Success, console.ErrorText);
+        Assert.Contains("Lines: 1", console.OutputText);
+        Assert.Contains("Malformed: 0", console.OutputText);
+    }
+
+    /// <summary>
+    /// Verifies that stats can summarize an actively written QLOG without crashing on Windows file sharing.
+    /// </summary>
+    [Fact]
+    public async Task Stats_ReadsBinaryLogWhileWriterKeepsFileOpen()
+    {
+        var path = Path.Combine(_dir, "active.qlog");
+        using var sink = new BinaryLogSink(path);
+        var entry = new LogEntry(DateTime.UtcNow, LogType.Info, "active", "L", null, "M", "f.cs", 1, 1, ThreadRole.Unknown);
+        sink.Write(in entry);
+        sink.Flush();
+        var console = new BufferToolConsole();
+
+        var result = await StatsCommand.ExecuteAsync(new StatsToolCommand(path), console);
+
+        Assert.True(result.Success, console.ErrorText);
+        Assert.Contains("Entries: 1", console.OutputText);
+        Assert.Contains("Info: 1", console.OutputText);
+    }
+
     [Fact]
     public async Task Doctor_FailsForCorruptedBinaryLog()
     {

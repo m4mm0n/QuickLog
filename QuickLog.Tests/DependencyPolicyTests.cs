@@ -12,7 +12,8 @@ public sealed class DependencyPolicyTests
         {
             Path.Combine(root, "QuickLog", "QuickLog.csproj"),
             Path.Combine(root, "QuickLog.Tools", "QuickLog.Tools.csproj"),
-            Path.Combine(root, "QuickLog.Sample", "QuickLog.Sample.csproj")
+            Path.Combine(root, "QuickLog.Sample", "QuickLog.Sample.csproj"),
+            Path.Combine(root, "samples", "QuickLog.LinuxSmoke", "QuickLog.LinuxSmoke.csproj")
         };
 
         foreach (var project in runtimeProjects)

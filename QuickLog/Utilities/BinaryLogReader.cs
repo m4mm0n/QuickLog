@@ -28,7 +28,7 @@ public static class BinaryLogReader
     /// <returns>The readable log entries from the file.</returns>
     public static IEnumerable<LogEntry> Read(string path, bool stopOnCrcError = true)
     {
-        var bytes = File.ReadAllBytes(path);
+        var bytes = ReadAllBytesShared(path);
         var offset = 0;
 
         while (offset < bytes.Length)
@@ -58,7 +58,7 @@ public static class BinaryLogReader
     {
         var entries = new List<LogEntry>();
         var diagnostics = new List<BinaryLogDiagnostic>();
-        var bytes = File.ReadAllBytes(path);
+        var bytes = ReadAllBytesShared(path);
         var offset = 0;
 
         while (offset < bytes.Length)
@@ -74,6 +74,22 @@ public static class BinaryLogReader
         }
 
         return new BinaryLogReadResult(entries, diagnostics);
+    }
+
+    /// <summary>
+    /// Reads a binary log snapshot while allowing the writer process to keep the file open.
+    /// </summary>
+    /// <param name="path">The binary log path to copy.</param>
+    /// <returns>The bytes visible at the time the file was opened.</returns>
+    private static byte[] ReadAllBytesShared(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        if (stream.CanSeek && stream.Length > int.MaxValue)
+            throw new IOException("Binary log is too large to read into memory.");
+
+        using var buffer = stream.CanSeek ? new MemoryStream((int)stream.Length) : new MemoryStream();
+        stream.CopyTo(buffer);
+        return buffer.ToArray();
     }
 
     /// <summary>

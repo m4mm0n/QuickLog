@@ -24,7 +24,6 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 
 namespace QuickLog.Utilities;
 
@@ -38,6 +37,13 @@ namespace QuickLog.Utilities;
 /// static and can be called as extension methods on the appropriate types.</remarks>
 internal static class Extensions
 {
+    private static readonly char[] PortableInvalidNameChars =
+    [
+        .. Path.GetInvalidFileNameChars(),
+        .. Path.GetInvalidPathChars(),
+        '<', '>', ':', '"', '\\', '/', '|', '?', '*'
+    ];
+
     public static string GetDescription(this Enum value)
     {
         var field = value.GetType().GetField(value.ToString());
@@ -51,12 +57,7 @@ internal static class Extensions
     }
 
     public static string ReplaceInvalidChars(this string filename)
-    {
-        Regex.Escape(new string(Path.GetInvalidFileNameChars()) + new string(Path.GetInvalidPathChars()));
-        var regexSearch = new string(Path.GetInvalidFileNameChars()) + new string(Path.GetInvalidPathChars());
-        var r = new Regex($"[{Regex.Escape(regexSearch)}]");
-        return r.Replace(filename, "");
-    }
+        => new(filename.Where(ch => !PortableInvalidNameChars.Contains(ch)).ToArray());
 
     /// <summary>
     /// Ensures that <paramref name="value"/> is not <see langword="null"/> and returns the validated value
@@ -74,14 +75,6 @@ internal static class Extensions
         value is null ? throw new ArgumentNullException(name, errorMessage) : value;
 
     public static string ReplaceInvalidPathChars(this string path)
-    {
-        // Get invalid characters for paths
-        var invalidChars = Path.GetInvalidPathChars();
-
-        // Create regex to match invalid characters
-        var regex = new Regex($"[{Regex.Escape(new string(invalidChars))}]");
-
-        return regex.Replace(path, "");
-    }
+        => new(path.Where(ch => !Path.GetInvalidPathChars().Contains(ch)).ToArray());
 
 }

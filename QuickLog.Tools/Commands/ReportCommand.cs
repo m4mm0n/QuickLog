@@ -66,7 +66,7 @@ public static class ReportCommand
             }
             else
             {
-                model.TextFileCounts.Add(new ReportFileCount(file, File.ReadLines(file).Count()));
+                model.TextFileCounts.Add(new ReportFileCount(file, ToolLogUtilities.ReadTextLines(file).Count()));
             }
         }
 

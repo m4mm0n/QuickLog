@@ -50,7 +50,7 @@ public static class GrepCommand
     {
         var matches = 0;
         var lineNumber = 0;
-        foreach (var line in File.ReadLines(path))
+        foreach (var line in ToolLogUtilities.ReadTextLines(path))
         {
             lineNumber++;
             if (!line.Contains(pattern, StringComparison.OrdinalIgnoreCase))

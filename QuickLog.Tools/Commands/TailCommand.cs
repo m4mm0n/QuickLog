@@ -15,7 +15,7 @@ public static class TailCommand
             return CommandResult.Fail();
         }
 
-        var lines = File.ReadLines(command.Path).TakeLast(Math.Max(0, command.Lines)).ToList();
+        var lines = ToolLogUtilities.ReadTextLines(command.Path).TakeLast(Math.Max(0, command.Lines)).ToList();
         foreach (var line in lines)
             console.WriteLine(line);
 
@@ -26,7 +26,7 @@ public static class TailCommand
         while (!cancellationToken.IsCancellationRequested)
         {
             await Task.Delay(250, cancellationToken).ConfigureAwait(false);
-            using var stream = new FileStream(command.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var stream = new FileStream(command.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             if (stream.Length <= position)
                 continue;
 

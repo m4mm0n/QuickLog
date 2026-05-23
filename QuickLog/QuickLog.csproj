@@ -7,22 +7,22 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
     <PackageId>ZLS.QuickLog</PackageId>
-    <Version>2.3.1</Version>
-    <AssemblyVersion>2.3.1.0</AssemblyVersion>
-    <FileVersion>2.3.1.0</FileVersion>
-    <PackageVersion>2.3.1</PackageVersion>
+    <Version>2.4.0</Version>
+    <AssemblyVersion>2.4.0.0</AssemblyVersion>
+    <FileVersion>2.4.0.0</FileVersion>
+    <PackageVersion>2.4.0</PackageVersion>
 
     <Product>QuickLog</Product>
     <Company>ZeroLinez Softworx</Company>
     <Authors>Geir Gustavsen</Authors>
     <Copyright>Copyright © ZeroLinez Softworx 2024–2026</Copyright>
     <Description>High-performance, engine-grade logging with exception ownership, crash dumps, auto-restart, and Godot integration. Zero external dependencies.</Description>
-    <PackageTags>logging;gamedev;godot;exceptions;crash-dump;async</PackageTags>
+    <PackageTags>logging;gamedev;godot;linux;exceptions;crash-dump;async</PackageTags>
     <RepositoryUrl>https://github.com/m4mm0n/QuickLog</RepositoryUrl>
     <PackageProjectUrl>https://github.com/m4mm0n/QuickLog</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>QuickLog v2.3.1 hardens the Godot integration with loaded-assembly reflection, retryable dynamic logger registration, Godot-owned exception hook cleanup, safe Godot log filenames, and focused regression coverage. Zero runtime dependencies.</PackageReleaseNotes>
+    <PackageReleaseNotes>QuickLog v2.4.0 adds verified Linux support with XDG-aware log profiles, Ubuntu CI and smoke coverage, active-log reader hardening, strict CLI option validation, and clean sample reruns. Zero runtime dependencies.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

@@ -78,7 +78,7 @@ public static class DoctorCommand
         var lines = 0;
         var malformed = 0;
 
-        foreach (var line in File.ReadLines(path))
+        foreach (var line in ToolLogUtilities.ReadTextLines(path))
         {
             lines++;
             var trimmed = line.Trim();

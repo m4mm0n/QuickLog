@@ -28,10 +28,11 @@ using QuickLog.Utilities;
 
 const string LogRoot = "logs";
 const string BinaryLogPath = "logs/quicklog.qlog";
+const string JsonLogPath = "logs/quicklog.jsonl";
 const string ExportPath = "logs/quicklog.export.log";
 
 Directory.CreateDirectory(LogRoot);
-foreach (var path in new[] { BinaryLogPath, ExportPath })
+foreach (var path in new[] { BinaryLogPath, JsonLogPath, ExportPath })
 {
     if (File.Exists(path))
         File.Delete(path);
@@ -64,7 +65,7 @@ var quickLogger = (QuickLogger)logger;
 using (LogContext.BeginCorrelation($"sample-{Guid.NewGuid():N}"))
 using (var session = LogSession.Begin(logger, "sample", quickLogger.SessionId))
 {
-    logger.Log(LogType.Info, "QuickLog v2.3 lean diagnostics sample started");
+    logger.Log(LogType.Info, "QuickLog v2.4 Linux-ready diagnostics sample started");
     session.Checkpoint("configured");
 
     quickLogger.LogOnce("startup.notice", LogType.Info, "This startup notice is written once");
@@ -104,7 +105,7 @@ var entries = BinaryLogReader.Read(BinaryLogPath, stopOnCrcError: false).ToArray
 BinaryLogExporter.ExportToText(BinaryLogPath, ExportPath);
 var summary = BinaryLogSummary.FromEntries(entries);
 
-Console.WriteLine("=== QuickLog v2.3 sample ===");
+Console.WriteLine("=== QuickLog v2.4 sample ===");
 Console.WriteLine($"Session: {sessionId}");
 Console.WriteLine($"Entries: {summary.EntryCount}");
 Console.WriteLine($"Binary:  {Path.GetFullPath(BinaryLogPath)}");

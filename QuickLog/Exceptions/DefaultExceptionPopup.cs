@@ -9,7 +9,7 @@
  */
 
 using System.Runtime.InteropServices;
-using QuickLog.Utilities;
+using QuickLog.Platform;
 
 namespace QuickLog.Exceptions;
 
@@ -38,7 +38,7 @@ public sealed class DefaultExceptionPopup : IExceptionPopup
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             ShowWindows(title, message, source);
         else
-            ShowConsoleFallback(title, message, exception);
+            ShowConsoleFallback(title, message);
     }
 
     private static void ShowWindows(string title, string message, ExceptionSource source)
@@ -47,13 +47,6 @@ public sealed class DefaultExceptionPopup : IExceptionPopup
         NativeMessageBox(IntPtr.Zero, message, title, MB_OK | icon | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_TOPMOST);
     }
 
-    private static void ShowConsoleFallback(string title, string message, Exception exception)
-    {
-        var separator = new string('=', 72);
-        Console.Error.WriteLine(separator);
-        Console.Error.WriteLine($"  {title}");
-        Console.Error.WriteLine(separator);
-        Console.Error.WriteLine(message);
-        Console.Error.WriteLine(separator);
-    }
+    private static void ShowConsoleFallback(string title, string message)
+        => QuickLogConsole.WriteErrorBlock(title, message);
 }

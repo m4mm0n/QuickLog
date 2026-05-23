@@ -71,6 +71,18 @@ internal static class ToolLogUtilities
             .ToList();
     }
 
+    /// <summary>
+    /// Reads text lines while allowing the producer process to keep the file open for writing.
+    /// </summary>
+    /// <param name="path">Path to the text log file.</param>
+    public static IEnumerable<string> ReadTextLines(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        while (reader.ReadLine() is { } line)
+            yield return line;
+    }
+
     private static bool IsSupportedLogFile(string path)
     {
         var extension = Path.GetExtension(path);
@@ -83,7 +95,7 @@ internal static class ToolLogUtilities
     private static IReadOnlyList<LogEntry> ReadJsonLines(string path)
     {
         var entries = new List<LogEntry>();
-        foreach (var line in File.ReadLines(path))
+        foreach (var line in ReadTextLines(path))
         {
             if (string.IsNullOrWhiteSpace(line))
                 continue;

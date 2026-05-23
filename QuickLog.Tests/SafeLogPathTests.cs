@@ -15,4 +15,22 @@ public sealed class SafeLogPathTests
         Assert.DoesNotContain(":", Path.GetFileName(path));
         Assert.DoesNotContain("?", Path.GetFileName(path));
     }
+
+    /// <summary>
+    /// Verifies that reserved Windows filename characters are sanitized even when tests run on Linux.
+    /// </summary>
+    [Fact]
+    public void SafeFileName_SanitizesPortableReservedCharacters()
+    {
+        var name = SafeLogPath.SafeFileName("<>:\"\\|?*");
+
+        Assert.DoesNotContain("<", name);
+        Assert.DoesNotContain(">", name);
+        Assert.DoesNotContain(":", name);
+        Assert.DoesNotContain("\"", name);
+        Assert.DoesNotContain("\\", name);
+        Assert.DoesNotContain("|", name);
+        Assert.DoesNotContain("?", name);
+        Assert.DoesNotContain("*", name);
+    }
 }

@@ -116,6 +116,9 @@ public static class ToolCommandParser
 
     private static ToolParseResult ParseDoctor(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--recursive") is { } unknown)
+            return unknown;
+
         var path = FirstPositional(args, 1);
         if (path is null)
             return ToolParseResult.Fail("doctor requires a path.");
@@ -125,6 +128,9 @@ public static class ToolCommandParser
 
     private static ToolParseResult ParseInspect(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--level", "--contains", "--correlation", "--from", "--to", "--limit") is { } unknown)
+            return unknown;
+
         var path = FirstPositional(args, 1);
         if (path is null)
             return ToolParseResult.Fail("inspect requires a path.");
@@ -150,6 +156,9 @@ public static class ToolCommandParser
 
     private static ToolParseResult ParseReplay(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--to", "--out") is { } unknown)
+            return unknown;
+
         var path = FirstPositional(args, 1);
         if (path is null)
             return ToolParseResult.Fail("replay requires a path.");
@@ -163,6 +172,9 @@ public static class ToolCommandParser
 
     private static ToolParseResult ParseBenchmark(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--iterations", "--mode") is { } unknown)
+            return unknown;
+
         if (!TryReadOptionalInt(args, "--iterations", out var iterations, out var error))
             return ToolParseResult.Fail(error);
 
@@ -175,6 +187,9 @@ public static class ToolCommandParser
 
     private static ToolParseResult ParseBundle(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--out", "--logs", "--crashes", "--include-env", "--include-exports", "--max-file-bytes", "--redact") is { } unknown)
+            return unknown;
+
         var output = Value(args, "--out");
         if (string.IsNullOrWhiteSpace(output))
             return ToolParseResult.Fail("bundle requires --out <zip>.");
@@ -198,6 +213,9 @@ public static class ToolCommandParser
         if (separator < 0 || separator == args.Count - 1)
             return ToolParseResult.Fail("launch requires -- <app> [args...].");
 
+        if (RejectUnknownOptions(args, 1, separator, "--out", "--name", "--diagnostic-env", "--wait-for-exit") is { } unknown)
+            return unknown;
+
         var output = Value(args, "--out") ?? Path.Combine("quicklog-sessions", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
         var app = args[separator + 1];
         var appArgs = args.Skip(separator + 2).ToArray();
@@ -213,6 +231,9 @@ public static class ToolCommandParser
 
     private static ToolParseResult ParseObserve(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--pid", "--duration", "--out") is { } unknown)
+            return unknown;
+
         if (!TryReadRequiredInt(args, "--pid", out var pid, out var error))
             return ToolParseResult.Fail(error);
 
@@ -229,10 +250,18 @@ public static class ToolCommandParser
             return ToolParseResult.Fail("profiler requires explain or env.");
 
         if (args[1].Equals("explain", StringComparison.OrdinalIgnoreCase))
+        {
+            if (RejectUnknownOptions(args, 2) is { } unknown)
+                return unknown;
+
             return ToolParseResult.Ok(new ProfilerExplainToolCommand());
+        }
 
         if (!args[1].Equals("env", StringComparison.OrdinalIgnoreCase))
             return ToolParseResult.Fail("profiler requires explain or env.");
+
+        if (RejectUnknownOptions(args, 2, "--clsid", "--path") is { } unknownEnv)
+            return unknownEnv;
 
         var clsidText = Value(args, "--clsid");
         if (!Guid.TryParse(clsidText, out var clsid))
@@ -248,6 +277,9 @@ public static class ToolCommandParser
     /// <summary>Parses tail command arguments.</summary>
     private static ToolParseResult ParseTail(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--lines", "--follow") is { } unknown)
+            return unknown;
+
         var path = FirstPositional(args, 1);
         if (path is null)
             return ToolParseResult.Fail("tail requires a path.");
@@ -261,6 +293,9 @@ public static class ToolCommandParser
     /// <summary>Parses grep command arguments.</summary>
     private static ToolParseResult ParseGrep(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--recursive") is { } unknown)
+            return unknown;
+
         var positionals = Positionals(args, 1);
         if (positionals.Count < 2)
             return ToolParseResult.Fail("grep requires a pattern and path.");
@@ -271,6 +306,9 @@ public static class ToolCommandParser
     /// <summary>Parses diff command arguments.</summary>
     private static ToolParseResult ParseDiff(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1) is { } unknown)
+            return unknown;
+
         var positionals = Positionals(args, 1);
         if (positionals.Count < 2)
             return ToolParseResult.Fail("diff requires left and right paths.");
@@ -281,6 +319,9 @@ public static class ToolCommandParser
     /// <summary>Parses stats command arguments.</summary>
     private static ToolParseResult ParseStats(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1) is { } unknown)
+            return unknown;
+
         var path = FirstPositional(args, 1);
         if (path is null)
             return ToolParseResult.Fail("stats requires a path.");
@@ -291,6 +332,9 @@ public static class ToolCommandParser
     /// <summary>Parses redact command arguments.</summary>
     private static ToolParseResult ParseRedact(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--out") is { } unknown)
+            return unknown;
+
         var input = FirstPositional(args, 1);
         var output = Value(args, "--out");
         if (input is null || string.IsNullOrWhiteSpace(output))
@@ -302,6 +346,9 @@ public static class ToolCommandParser
     /// <summary>Parses summarize command arguments.</summary>
     private static ToolParseResult ParseSummarize(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--out") is { } unknown)
+            return unknown;
+
         var path = FirstPositional(args, 1);
         var output = Value(args, "--out");
         if (path is null || string.IsNullOrWhiteSpace(output))
@@ -313,6 +360,9 @@ public static class ToolCommandParser
     /// <summary>Parses report command arguments.</summary>
     private static ToolParseResult ParseReport(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--out", "--logs", "--crashes") is { } unknown)
+            return unknown;
+
         var output = Value(args, "--out");
         if (string.IsNullOrWhiteSpace(output))
             return ToolParseResult.Fail("report requires --out <report.html>.");
@@ -323,6 +373,9 @@ public static class ToolCommandParser
     /// <summary>Parses repair command arguments.</summary>
     private static ToolParseResult ParseRepair(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--out") is { } unknown)
+            return unknown;
+
         var path = FirstPositional(args, 1);
         var output = Value(args, "--out");
         if (path is null || string.IsNullOrWhiteSpace(output))
@@ -334,6 +387,9 @@ public static class ToolCommandParser
     /// <summary>Parses merge command arguments.</summary>
     private static ToolParseResult ParseMerge(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1, "--out") is { } unknown)
+            return unknown;
+
         var inputs = Positionals(args, 1);
         var output = Value(args, "--out");
         if (inputs.Count < 2 || string.IsNullOrWhiteSpace(output))
@@ -345,6 +401,9 @@ public static class ToolCommandParser
     /// <summary>Parses timeline command arguments.</summary>
     private static ToolParseResult ParseTimeline(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1) is { } unknown)
+            return unknown;
+
         var path = FirstPositional(args, 1);
         if (path is null)
             return ToolParseResult.Fail("timeline requires a path.");
@@ -355,11 +414,36 @@ public static class ToolCommandParser
     /// <summary>Parses doctor-config command arguments.</summary>
     private static ToolParseResult ParseDoctorConfig(IReadOnlyList<string> args)
     {
+        if (RejectUnknownOptions(args, 1) is { } unknown)
+            return unknown;
+
         var path = FirstPositional(args, 1);
         if (path is null)
             return ToolParseResult.Fail("doctor-config requires a path.");
 
         return ToolParseResult.Ok(new DoctorConfigToolCommand(path));
+    }
+
+    /// <summary>Rejects option-like arguments that are not valid for the command being parsed.</summary>
+    private static ToolParseResult? RejectUnknownOptions(IReadOnlyList<string> args, int start, params string[] knownOptions)
+        => RejectUnknownOptions(args, start, args.Count, knownOptions);
+
+    /// <summary>Rejects option-like arguments in a bounded argument range.</summary>
+    private static ToolParseResult? RejectUnknownOptions(IReadOnlyList<string> args, int start, int endExclusive, params string[] knownOptions)
+    {
+        for (var i = start; i < Math.Min(args.Count, endExclusive); i++)
+        {
+            var argument = args[i];
+            if (!argument.StartsWith("--", StringComparison.Ordinal) || argument == "--")
+                continue;
+
+            if (knownOptions.Any(option => option.Equals(argument, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            return ToolParseResult.Fail($"Unknown option '{argument}' for {args[0]}.");
+        }
+
+        return null;
     }
 
     private static string? FirstPositional(IReadOnlyList<string> args, int start)

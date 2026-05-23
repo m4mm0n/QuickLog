@@ -15,11 +15,11 @@ and message-template complexity. What you get instead is **clarity, control, and
 ## Install
 
 ```powershell
-dotnet add package ZLS.QuickLog --version 2.3.1
+dotnet add package ZLS.QuickLog --version 2.4.0
 ```
 
-QuickLog targets `net8.0` and `net10.0`, ships with XML documentation, and has
-no external package dependencies.
+QuickLog targets `net8.0` and `net10.0`, is verified on Windows and Linux,
+ships with XML documentation, and has no external package dependencies.
 
 ---
 
@@ -112,7 +112,7 @@ LogManager.Shutdown();
 ### Exception Ownership *(v2.0)*
 - Hook `AppDomain.UnhandledException` and `TaskScheduler.UnobservedTaskException`
 - Log every captured exception automatically
-- Modal popup (native `MessageBoxW` — zero deps)
+- Modal popup on Windows (native `MessageBoxW` — zero deps), safe stderr fallback elsewhere
 - Structured JSON crash dump (`crash_*.json`)
 - Auto-restart on fatal exceptions (with loop guard)
 - Recovery delegate for non-fatal task exceptions
@@ -139,6 +139,13 @@ LogManager.Shutdown();
 - Level / role toggles
 - Grouping by time slices
 - Filter presets (save/load)
+
+### Linux Support *(v2.4)*
+- XDG-aware log roots via `LoggerOptions.ForLinux(...)`
+- `$XDG_STATE_HOME/<app>/logs` preferred, `~/.local/state/<app>/logs` fallback
+- Ubuntu CI and Linux smoke project coverage
+- Active-log inspection while apps keep JSONL/QLOG files open
+- No Linux-specific runtime dependencies
 
 ---
 
@@ -211,6 +218,25 @@ Other lean profiles:
 var service = LoggerOptions.ForService("logs");
 var tool = LoggerOptions.ForTool("asset-packer");
 var godot = LoggerOptions.ForGodot("user://logs");
+var linux = LoggerOptions.ForLinux("my-game");
+```
+
+`ForLinux("my-game")` writes JSON Lines and QLOG output below
+`$XDG_STATE_HOME/my-game/logs` when `XDG_STATE_HOME` is set, otherwise below
+`~/.local/state/my-game/logs`. Pass `logDirectory` when a service manager,
+container, or launcher owns the output path:
+
+```csharp
+LogManager.ConfigureDefault(
+    LoggerOptions.ForLinux("my-service", logDirectory: "/var/log/my-service")
+        .WithMinimumLevel(LogType.Info));
+```
+
+Linux smoke check from the repo:
+
+```bash
+dotnet run --project samples/QuickLog.LinuxSmoke -- /tmp/quicklog-linux-smoke
+dotnet run --project QuickLog.Tools -- doctor /tmp/quicklog-linux-smoke --recursive
 ```
 
 Validate options before shipping a preset from config:
@@ -770,3 +796,4 @@ MIT
 | Exception ownership | Stable (v2.0) |
 | Crash dump writer | Stable (v2.3 fingerprints + state snapshots) |
 | Godot integration | Stable bridge and file logging; dynamic engine sink is best-effort with manual bridge fallback |
+| Linux support | Verified (v2.4 XDG profile + Ubuntu smoke coverage) |

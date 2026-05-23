@@ -259,4 +259,18 @@ public sealed class ToolCommandParserTests
         Assert.Null(result.Command);
         Assert.Contains("requires --", result.Error);
     }
+
+    /// <summary>
+    /// Verifies that mistyped or unsupported command options fail instead of being silently ignored.
+    /// </summary>
+    [Fact]
+    public void Parse_UnknownOption_ReturnsParseError()
+    {
+        var result = ToolCommandParser.Parse(["stats", "logs/app.qlog", "--bogus"]);
+
+        Assert.False(result.Success);
+        Assert.Null(result.Command);
+        Assert.Contains("Unknown option", result.Error);
+        Assert.Contains("--bogus", result.Error);
+    }
 }

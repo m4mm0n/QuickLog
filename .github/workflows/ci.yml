@@ -8,12 +8,13 @@ on:
 
 jobs:
   test:
-    name: Test (.NET ${{ matrix.dotnet }})
-    runs-on: windows-latest
+    name: Test (${{ matrix.os }}, .NET ${{ matrix.dotnet }})
+    runs-on: ${{ matrix.os }}
 
     strategy:
       matrix:
         dotnet: [ '10.0.x' ]
+        os: [ windows-latest, ubuntu-latest ]
 
     steps:
       - name: Checkout
@@ -32,3 +33,7 @@ jobs:
 
       - name: Test
         run: dotnet test QuickLog.Tests/QuickLog.Tests.csproj --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: Linux smoke
+        if: runner.os == 'Linux'
+        run: dotnet run --project samples/QuickLog.LinuxSmoke/QuickLog.LinuxSmoke.csproj --configuration Release --no-build -- /tmp/quicklog-linux-smoke

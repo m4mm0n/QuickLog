@@ -1,5 +1,6 @@
 using QuickLog.Core;
 using QuickLog.Loggers;
+using QuickLog.Platform;
 
 namespace QuickLog;
 
@@ -252,6 +253,28 @@ public sealed class LoggerOptions
     /// <param name="logDirectory">Godot-style or filesystem log directory.</param>
     public static LoggerOptions ForGodot(string logDirectory = "user://logs") => ForEngine(logDirectory)
         .WithSession("godot", autoId: true);
+
+    /// <summary>
+    /// Creates a Linux-ready profile that stores durable logs below the XDG state directory by default.
+    /// </summary>
+    /// <param name="applicationName">Application folder name used below the Linux state directory.</param>
+    /// <param name="logDirectory">Optional explicit log directory. When supplied, XDG resolution is bypassed.</param>
+    /// <param name="stateHome">Optional XDG state directory override, mainly useful for tests and controlled hosts.</param>
+    /// <param name="homeDirectory">Optional home directory override used when no state directory is available.</param>
+    public static LoggerOptions ForLinux(
+        string applicationName = "QuickLog",
+        string? logDirectory = null,
+        string? stateHome = null,
+        string? homeDirectory = null)
+    {
+        var root = string.IsNullOrWhiteSpace(logDirectory)
+            ? QuickLogPathResolver.GetLinuxLogDirectory(applicationName, stateHome, homeDirectory)
+            : logDirectory;
+
+        return ForEngine(root)
+            .WithConsole(false)
+            .WithSession("linux", autoId: true);
+    }
 
     /// <summary>
     /// Sets session metadata used by startup/shutdown summaries.

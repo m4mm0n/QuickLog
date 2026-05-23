@@ -6,12 +6,36 @@ This changelog follows Semantic Versioning and Keep a Changelog style sections.
 
 ## Version Provenance
 
-- `2.3.1` is the current Godot hardening release line.
+- `2.4.0` is the current Linux support release line.
+- `2.3.1` is tagged as `v2.3.1`.
 - `2.3.0` is tagged as `v2.3.0`.
 - `2.2.0` is tagged as `v2.2.0`.
 - `2.1.0` is tagged as `v2.1.0`.
 - `2.0.0` is tagged as `v2.0.0`.
 - Versions before `2.0.0` are retrospective changelog labels. The repository history before `2.0.0` did not record package version metadata or release tags, so those entries describe historical milestones rather than published tags.
+
+## [2.4.0] - 2026-05-23
+
+### Added
+
+- Added explicit Linux platform facts and capabilities through `QuickLog.Platform`.
+- Added XDG-aware Linux log directory resolution through `QuickLogPathResolver`.
+- Added `LoggerOptions.ForLinux(...)` for dependency-free durable JSON Lines and QLOG output under `$XDG_STATE_HOME/<app>/logs` or `~/.local/state/<app>/logs`.
+- Added `samples/QuickLog.LinuxSmoke` and Ubuntu CI/release smoke coverage.
+- Added regression coverage for Linux profiles, Linux smoke project wiring, Ubuntu workflows, active log reads, and sample reruns.
+
+### Changed
+
+- Changed package metadata from `2.3.1` to `2.4.0`.
+- Changed tool text and binary readers to open active log files with read/write sharing so diagnostics can inspect logs while applications are still running.
+- Changed the sample app to replace `quicklog.jsonl` as well as QLOG and text export outputs on each run.
+- Changed CLI parsing so unknown options fail with a parse error instead of being silently ignored.
+- Changed non-Windows exception popup fallback to suppress stderr failures during exception handling.
+
+### Notes
+
+- Linux support does not add runtime dependencies and keeps the package targeting `net8.0` and `net10.0`.
+- Native modal popup support remains Windows-only; Linux exception reporting uses a safe stderr fallback or caller-provided `IExceptionPopup`.
 
 ## [2.3.1] - 2026-05-19
 

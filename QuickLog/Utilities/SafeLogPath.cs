@@ -5,13 +5,19 @@ namespace QuickLog.Utilities;
 /// </summary>
 public static class SafeLogPath
 {
+    private static readonly char[] PortableInvalidFileNameChars =
+    [
+        .. Path.GetInvalidFileNameChars(),
+        '<', '>', ':', '"', '\\', '/', '|', '?', '*'
+    ];
+
     /// <summary>
     /// Replaces invalid filename characters and returns a non-empty filename.
     /// </summary>
     /// <param name="name">Raw filename or session name.</param>
     public static string SafeFileName(string name)
     {
-        var invalid = Path.GetInvalidFileNameChars();
+        var invalid = PortableInvalidFileNameChars;
         var cleaned = new string(name.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray()).Trim();
         return string.IsNullOrWhiteSpace(cleaned) ? "quicklog" : cleaned;
     }
