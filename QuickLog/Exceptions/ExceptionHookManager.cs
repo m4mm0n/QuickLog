@@ -1,13 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : ExceptionHookManager.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11
- *  License        : MIT — https://opensource.org/licenses/MIT
- * ====================================================================================================
- */
-
 using QuickLog.Core;
 using QuickLog.Utilities;
 
@@ -235,6 +225,9 @@ public static class ExceptionHookManager
     {
         try
         {
+            if (!RestartOptions.IsAutoRestartSupported)
+                return;
+
             var currentCount = RestartOptions.CurrentRestartCount;
             if (currentCount >= restart.MaxRestartCount)
                 return;
@@ -246,8 +239,8 @@ public static class ExceptionHookManager
             if (exe is null) return;
 
             var originalArgs = Environment.GetCommandLineArgs().Skip(1); // skip exe name
-            var extraArgs    = restart.ExtraArguments ?? [];
-            var allArgs      = string.Join(" ", originalArgs.Concat(extraArgs).Select(a => $"\"{a}\""));
+            var extraArgs = restart.ExtraArguments ?? [];
+            var allArgs = string.Join(" ", originalArgs.Concat(extraArgs).Select(a => $"\"{a}\""));
 
             var psi = new System.Diagnostics.ProcessStartInfo(exe, allArgs)
             {

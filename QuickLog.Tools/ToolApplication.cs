@@ -2,8 +2,14 @@ namespace QuickLog.Tools;
 
 using QuickLog.Tools.Commands;
 
+/// <summary>Dispatches parsed QuickLog tool commands to their implementations.</summary>
 public static class ToolApplication
 {
+    /// <summary>Parses and executes a tool command using the supplied console abstraction.</summary>
+    /// <param name="args">The command-line arguments.</param>
+    /// <param name="console">The destination for standard and error output.</param>
+    /// <param name="cancellationToken">A token that cancels asynchronous command work.</param>
+    /// <returns>A task that resolves to the command exit code.</returns>
     public static async Task<int> RunAsync(string[] args, IToolConsole console, CancellationToken cancellationToken = default)
     {
         var parsed = ToolCommandParser.Parse(args);

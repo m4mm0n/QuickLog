@@ -12,7 +12,11 @@ internal sealed class TraceSink : ILogSink
 {
     public void Write(in LogEntry entry)
     {
-        var line = $"[{entry.Timestamp:O}] [{entry.Level}] [{entry.MemberName}] {entry.Message}";
+        var eventText = entry.EventId == LogEventId.None ? string.Empty : $" [{entry.EventId}]";
+        var properties = LogProperties.Format(entry.Properties);
+        if (properties.Length > 0)
+            properties = $" {properties}";
+        var line = $"[{entry.Timestamp:O}] [{entry.Level}]{eventText} [{entry.MemberName}] {entry.Message}{properties}";
 
         if (entry.Level >= LogType.Error)
             Trace.TraceError(line);

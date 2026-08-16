@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : Crc32.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2024-10-21 11:56:51 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 8C663E75
- *  
- *  Description    :
- *                   A simple CRC32 class which supports calculating the CRC32 checksum of a file, byte array or stream
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 8C663E75
-
-namespace QuickLog.Utilities;
+﻿namespace QuickLog.Utilities;
 
 /// <summary>
 /// A simple CRC32 class which supports calculating the CRC32 checksum of a file, byte array or stream

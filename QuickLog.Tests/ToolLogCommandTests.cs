@@ -107,6 +107,35 @@ public sealed class ToolLogCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Inspect_FiltersAndPrintsStructuredEvents()
+    {
+        var path = CreateBinaryLog("structured-inspect.qlog",
+            new LogEntry(
+                DateTime.UtcNow, LogType.Warn, "retry", "L", null, "M", "f.cs", 3, 1,
+                ThreadRole.Network,
+                EventId: new LogEventId(401, "PacketRetry"),
+                Properties: LogProperties.Create(
+                    new LogProperty("host", "edge-1"),
+                    new LogProperty("attempt", 3))),
+            new LogEntry(
+                DateTime.UtcNow, LogType.Info, "connected", "L", null, "M", "f.cs", 4, 1,
+                ThreadRole.Network,
+                EventId: new LogEventId(402, "Connected"),
+                Properties: LogProperties.Create(new LogProperty("host", "edge-2"))));
+        var console = new BufferToolConsole();
+
+        var result = await InspectCommand.ExecuteAsync(
+            new InspectToolCommand(path, null, null, null, null, null, null, "PacketRetry", "attempt=3"),
+            console);
+
+        Assert.True(result.Success, console.ErrorText);
+        Assert.Contains("Entries: 1", console.OutputText);
+        Assert.Contains("PacketRetry(401)", console.OutputText);
+        Assert.Contains("attempt=3", console.OutputText);
+        Assert.DoesNotContain("Connected", console.OutputText);
+    }
+
+    [Fact]
     public async Task Replay_Text_WritesContextAwareTextExport()
     {
         var path = CreateBinaryLog("replay-text.qlog",
@@ -139,6 +168,29 @@ public sealed class ToolLogCommandTests : IDisposable
         Assert.Equal("Crit", doc.RootElement.GetProperty("level").GetString());
         Assert.Equal("json me", doc.RootElement.GetProperty("message").GetString());
         Assert.Equal("corr-json", doc.RootElement.GetProperty("correlation").GetString());
+    }
+
+    [Fact]
+    public async Task Stats_ReportsEventAndPropertyCounts()
+    {
+        var path = CreateBinaryLog("structured-stats.qlog",
+            new LogEntry(
+                DateTime.UtcNow, LogType.Info, "one", "L", null, "M", "f.cs", 1, 1,
+                ThreadRole.Main,
+                EventId: new LogEventId(12, "Frame"),
+                Properties: LogProperties.Create(new LogProperty("frame", 1))),
+            new LogEntry(
+                DateTime.UtcNow, LogType.Info, "two", "L", null, "M", "f.cs", 2, 1,
+                ThreadRole.Main,
+                EventId: new LogEventId(12, "Frame"),
+                Properties: LogProperties.Create(new LogProperty("frame", 2))));
+        var console = new BufferToolConsole();
+
+        var result = await StatsCommand.ExecuteAsync(new StatsToolCommand(path), console);
+
+        Assert.True(result.Success, console.ErrorText);
+        Assert.Contains("Event: 2 x Frame(12)", console.OutputText);
+        Assert.Contains("Property: 2 x frame", console.OutputText);
     }
 
     private string CreateBinaryLog(string fileName, params LogEntry[] entries)

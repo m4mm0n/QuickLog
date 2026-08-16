@@ -42,6 +42,33 @@ internal static class ToolLogUtilities
 
         foreach (var message in summary.TopMessages.Take(5))
             console.WriteLine($"Top: {message.Count} x {message.Message}");
+
+        foreach (var pair in summary.EventCounts.OrderByDescending(pair => pair.Value).Take(5))
+            console.WriteLine($"Event: {pair.Value} x {pair.Key}");
+
+        foreach (var pair in summary.PropertyCounts.OrderByDescending(pair => pair.Value).Take(5))
+            console.WriteLine($"Property: {pair.Value} x {pair.Key}");
+    }
+
+    /// <summary>Tests an entry against a <c>name</c> or <c>name=value</c> property expression.</summary>
+    /// <param name="entry">The entry to inspect.</param>
+    /// <param name="expression">The property expression.</param>
+    /// <returns><see langword="true"/> when the expression matches.</returns>
+    public static bool MatchesProperty(in LogEntry entry, string expression)
+    {
+        if (entry.Properties is null || string.IsNullOrWhiteSpace(expression))
+            return false;
+
+        var separator = expression.IndexOf('=');
+        var name = separator < 0 ? expression : expression[..separator];
+        var expected = separator < 0 ? null : expression[(separator + 1)..];
+        var pair = entry.Properties.FirstOrDefault(candidate =>
+            string.Equals(candidate.Key, name, StringComparison.OrdinalIgnoreCase));
+        if (pair.Key is null)
+            return false;
+
+        return expected is null
+               || string.Equals(LogProperties.FormatValue(pair.Value), expected, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -117,7 +144,9 @@ internal static class ToolLogUtilities
                     ThreadRole.Unknown,
                     ReadString(root, "correlation"),
                     ReadString(root, "trace"),
-                    ReadString(root, "span")));
+                    ReadString(root, "span"),
+                    new LogEventId(ReadInt(root, "eventId"), ReadString(root, "eventName")),
+                    ReadProperties(root)));
             }
             catch
             {
@@ -147,4 +176,27 @@ internal static class ToolLogUtilities
             && Enum.TryParse<LogType>(value.GetString(), ignoreCase: true, out var parsed)
                 ? parsed
                 : LogType.Info;
+
+    private static IReadOnlyDictionary<string, object?> ReadProperties(JsonElement element)
+    {
+        if (!element.TryGetProperty("properties", out var properties)
+            || properties.ValueKind != JsonValueKind.Object)
+            return LogProperties.Empty;
+
+        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var property in properties.EnumerateObject())
+            values[property.Name] = ReadValue(property.Value);
+        return LogProperties.Snapshot(values);
+    }
+
+    private static object? ReadValue(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Null => null,
+        JsonValueKind.String => value.GetString(),
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Number when value.TryGetInt64(out var integer) => integer,
+        JsonValueKind.Number when value.TryGetDouble(out var number) => number,
+        _ => value.GetRawText()
+    };
 }

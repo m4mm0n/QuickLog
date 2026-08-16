@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : BinaryLogQuery.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 06:27:00 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 1770E95D
- *  
- *  Description    :
- *                   Provides filtered views over binary log files without loading them fully into memory.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 1770E95D
-
-using QuickLog.Core;
+﻿using QuickLog.Core;
 
 namespace QuickLog.Utilities;
 
@@ -57,6 +35,35 @@ public static class BinaryLogQuery
         bool stopOnCrcError = true) =>
         BinaryLogReader.Read(path, stopOnCrcError)
             .Where(e => string.Equals(e.CorrelationId, correlationId, StringComparison.Ordinal));
+
+    /// <summary>Enumerates log entries matching an event identifier.</summary>
+    /// <param name="path">The QLOG path.</param>
+    /// <param name="eventId">The numeric event identifier.</param>
+    /// <param name="stopOnCrcError">Whether to stop at the first CRC mismatch.</param>
+    /// <returns>The matching entries.</returns>
+    public static IEnumerable<LogEntry> WithEventId(
+        string path,
+        int eventId,
+        bool stopOnCrcError = true) =>
+        BinaryLogReader.Read(path, stopOnCrcError).Where(entry => entry.EventId.Id == eventId);
+
+    /// <summary>Enumerates log entries containing a structured property with an optional expected value.</summary>
+    /// <param name="path">The QLOG path.</param>
+    /// <param name="name">The property name.</param>
+    /// <param name="value">The optional invariant text value to match.</param>
+    /// <param name="comparison">The text comparison used for values.</param>
+    /// <param name="stopOnCrcError">Whether to stop at the first CRC mismatch.</param>
+    /// <returns>The matching entries.</returns>
+    public static IEnumerable<LogEntry> WithProperty(
+        string path,
+        string name,
+        string? value = null,
+        StringComparison comparison = StringComparison.OrdinalIgnoreCase,
+        bool stopOnCrcError = true) =>
+        BinaryLogReader.Read(path, stopOnCrcError).Where(entry =>
+            entry.Properties is not null
+            && entry.Properties.TryGetValue(name, out var actual)
+            && (value is null || string.Equals(LogProperties.FormatValue(actual), value, comparison)));
 
     /// <summary>
     /// Enumerates log entries whose message contains the given text.

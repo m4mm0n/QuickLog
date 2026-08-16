@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : ConsoleSink.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 05:45:55 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 58119F7C
- *  
- *  Description    :
- *                   Provides a log sink that writes log entries to the console output.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 58119F7C
-
-using QuickLog.Core;
+﻿using QuickLog.Core;
 
 namespace QuickLog.Sinks;
 

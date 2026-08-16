@@ -1,28 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : GodotUserPathResolver.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2025-09-17 20:39:05 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 17D7F77E
- *  
- *  Description    :
- *                   Resolves Godot's user:// directory at runtime without any compile-time dependency on Godot.
- *                   If the Godot runtime is present, attempts to call ProjectSettings.GlobalizePath("user://") via reflection.
- *                   Otherwise returns a safe, OS-specific fallback directory.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 17D7F77E
-
-namespace QuickLog.Utilities;
+﻿namespace QuickLog.Utilities;
 
 /// <summary>
 /// Resolves Godot's user:// directory at runtime without any compile-time dependency on Godot.

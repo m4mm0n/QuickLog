@@ -1,12 +1,4 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : RestartOptions.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11
- *  License        : MIT — https://opensource.org/licenses/MIT
- * ====================================================================================================
- */
+using QuickLog.Platform;
 
 namespace QuickLog.Exceptions;
 
@@ -67,4 +59,12 @@ public sealed class RestartOptions
     /// </summary>
     public static int CurrentRestartCount =>
         int.TryParse(Environment.GetEnvironmentVariable(RestartCountEnvVar), out var n) ? n : 0;
+
+    /// <summary>
+    /// Gets whether the current platform supports spawning a replacement process after a fatal exception.
+    /// </summary>
+    public static bool IsAutoRestartSupported => SupportsAutoRestart(QuickLogPlatform.CurrentKind);
+
+    internal static bool SupportsAutoRestart(QuickLogPlatformKind kind)
+        => QuickLogPlatform.GetCapabilities(kind).SupportsProcessRestart;
 }

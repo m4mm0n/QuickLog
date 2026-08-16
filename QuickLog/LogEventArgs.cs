@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : LogEventArgs.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2024-10-06 09:02:53 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : C9D239D6
- *  
- *  Description    :
- *                   Event arguments for logging, containing information about the log type, message, exception, and caller details.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: C9D239D6
-
-using System.Text;
+﻿using System.Text;
 using QuickLog.Utilities;
 
 namespace QuickLog;
@@ -86,6 +64,16 @@ public class LogEventArgs : EventArgs
     public string? SpanId { get; }
 
     /// <summary>
+    /// Gets the stable identifier assigned to the event.
+    /// </summary>
+    public LogEventId EventId { get; }
+
+    /// <summary>
+    /// Gets the immutable structured properties attached to the event.
+    /// </summary>
+    public IReadOnlyDictionary<string, object?> Properties { get; }
+
+    /// <summary>
     /// Gets or sets the time-stamp format to use for each log-entry.
     /// </summary>
     public static string TimestampFormat { get; set; } = "yyyy-MM-dd HH:mm:ss";
@@ -125,6 +113,8 @@ public class LogEventArgs : EventArgs
     /// <param name="correlationId">The correlation identifier active when the entry was created.</param>
     /// <param name="traceId">The trace identifier active when the entry was created.</param>
     /// <param name="spanId">The span identifier active when the entry was created.</param>
+    /// <param name="eventId">The stable event identifier.</param>
+    /// <param name="properties">The structured properties attached to the event.</param>
     public LogEventArgs(
         LogType logType,
         string? message,
@@ -135,7 +125,9 @@ public class LogEventArgs : EventArgs
         string? scope = null,
         string? correlationId = null,
         string? traceId = null,
-        string? spanId = null)
+        string? spanId = null,
+        LogEventId eventId = default,
+        IReadOnlyDictionary<string, object?>? properties = null)
     {
         LoggingType = logType;
         Message = message;
@@ -148,6 +140,8 @@ public class LogEventArgs : EventArgs
         CorrelationId = correlationId;
         TraceId = traceId;
         SpanId = spanId;
+        EventId = eventId;
+        Properties = LogProperties.Snapshot(properties);
     }
 
     /// <summary>
@@ -161,6 +155,10 @@ public class LogEventArgs : EventArgs
             sb += $"{Environment.NewLine}{Message}";
         if (Exception != null)
             sb += $"{Environment.NewLine}{Exception.ToStringDemystified()}";
+        if (EventId != LogEventId.None)
+            sb += $"{Environment.NewLine}Event: {EventId}";
+        if (Properties.Count > 0)
+            sb += $"{Environment.NewLine}{LogProperties.Format(Properties)}";
         return sb;
     }
     /// <summary>

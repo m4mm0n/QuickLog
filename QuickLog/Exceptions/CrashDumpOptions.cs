@@ -1,13 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : CrashDumpOptions.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11
- *  License        : MIT — https://opensource.org/licenses/MIT
- * ====================================================================================================
- */
-
 namespace QuickLog.Exceptions;
 
 using QuickLog.Core;

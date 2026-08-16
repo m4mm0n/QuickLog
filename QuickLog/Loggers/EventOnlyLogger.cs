@@ -1,27 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : EventOnlyLogger.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2024-10-06 09:02:53 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 4EA6CC74
- *  
- *  Description    :
- *                   A logger that only triggers log events without writing to a file or console.
- *                   This logger is useful when you want to capture logs through event handlers.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 4EA6CC74
-
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace QuickLog.Loggers;
 

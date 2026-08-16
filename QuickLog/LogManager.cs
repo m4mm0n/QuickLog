@@ -1,27 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : LogManager.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2024-10-09 20:49:25 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 23737EEC
- *  
- *  Description    :
- *                   Manages the creation, configuration, and access of loggers throughout the application.
- *                   Provides thread-safe access to named loggers and a default logger for centralized logging management.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 23737EEC
-
-using QuickLog.Exceptions;
+﻿using QuickLog.Exceptions;
 using QuickLog.Godot;
 using QuickLog.Loggers;
 using QuickLog.Utilities;
@@ -126,43 +103,9 @@ public static class LogManager
     /// </example>
     public static void ConfigureDefault(LoggerOptions options)
     {
-        _defaultLogger = new QuickLogger(options.LogFilePath)
-        {
-            EnableConsoleLogging    = options.ConsoleLogging,
-            EnableFileLogging       = options.FileLogging && options.LogFilePath != null,
-            EnableEventLogging      = options.EventLogging,
-            EnableTraceLogging      = options.TraceLogging,
-            EnableAsyncLogging      = options.AsyncLogging,
-            AsyncOnly               = options.AsyncOnly,
-            AsyncDropPolicy         = options.AsyncDropPolicy,
-            AsyncMinimumLevel       = options.AsyncMinimumLevel,
-            AsyncProtectedRole      = options.AsyncProtectedRole,
-            JsonLogPath             = options.JsonLogPath,
-            EnableAsyncBinaryLogging = options.AsyncBinaryLogging,
-            BinaryLogPath           = options.BinaryLogPath,
-            EnableAsyncTraceLogging = options.AsyncTraceLogging,
-            Rotation                = options.Rotation,
-            AsyncQueueCapacity      = options.AsyncQueueCapacity,
-            Redaction               = options.Redaction,
-            SpamControl             = options.SpamControl,
-            Filter                  = options.Filter,
-            SessionName             = options.SessionName,
-            SessionId               = options.AutoSessionId ? Guid.NewGuid().ToString("N") : options.SessionName ?? "quicklog",
-            EmitStartupBanner       = options.EmitStartupBanner,
-            EmitShutdownSummary     = options.EmitShutdownSummary,
-            UseAnsiColor            = options.UseAnsiColor,
-            CompactText             = options.CompactText,
-            UseLocalTime            = options.UseLocalTime,
-            MinimumLevel            = options.MinimumLevel
-        };
-
-        foreach (var pair in options.SinkMinimumLevels)
-            _defaultLogger.SinkMinimumLevels[pair.Key] = pair.Value;
-
+        ArgumentNullException.ThrowIfNull(options);
+        _defaultLogger = options.CreateLogger();
         _configured = true;
-
-        if (_defaultLogger.EmitStartupBanner)
-            _defaultLogger.EmitStartup();
     }
 
     /// <summary>

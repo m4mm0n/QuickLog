@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 
 namespace QuickLog;
 
@@ -46,6 +47,7 @@ public static class QLogDiscovery
     /// </summary>
     /// <param name="assembly">Assembly to scan.</param>
     /// <returns>Marked targets ordered by name.</returns>
+    [RequiresUnreferencedCode("Assembly-wide QLOG discovery requires marker metadata to be preserved by the application.")]
     public static IReadOnlyList<QLogTarget> Scan(Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(assembly);
@@ -64,7 +66,12 @@ public static class QLogDiscovery
     /// </summary>
     /// <param name="type">Type to scan.</param>
     /// <returns>Marked targets ordered by name.</returns>
-    public static IReadOnlyList<QLogTarget> Scan(Type type)
+    public static IReadOnlyList<QLogTarget> Scan(
+        [DynamicallyAccessedMembers(
+            DynamicallyAccessedMemberTypes.PublicMethods
+            | DynamicallyAccessedMemberTypes.NonPublicMethods
+            | DynamicallyAccessedMemberTypes.PublicConstructors
+            | DynamicallyAccessedMemberTypes.NonPublicConstructors)] Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
 
@@ -123,6 +130,7 @@ public static class QLogDiscovery
     /// </summary>
     /// <param name="assembly">Assembly to inspect.</param>
     /// <returns>Loadable types from the assembly.</returns>
+    [RequiresUnreferencedCode("Assembly type enumeration requires metadata to be preserved.")]
     private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
     {
         try

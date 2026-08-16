@@ -1,13 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : GodotLogOptions.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11
- *  License        : MIT — https://opensource.org/licenses/MIT
- * ====================================================================================================
- */
-
 using QuickLog.Exceptions;
 
 namespace QuickLog.Godot;

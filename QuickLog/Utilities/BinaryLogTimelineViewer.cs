@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : BinaryLogTimelineViewer.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 06:48:35 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 6120CBB0
- *  
- *  Description    :
- *                   Provides a console-based interactive viewer for navigating and inspecting entries in a binary log file.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 6120CBB0
-
-using QuickLog.Core;
+﻿using QuickLog.Core;
 
 namespace QuickLog.Utilities;
 
@@ -244,6 +222,12 @@ public static class BinaryLogTimelineViewer
 
         if (!string.IsNullOrWhiteSpace(e.Category))
             Console.WriteLine($"Category   : {e.Category}");
+
+        if (e.EventId != LogEventId.None)
+            Console.WriteLine($"Event      : {e.EventId}");
+
+        if (e.Properties is { Count: > 0 })
+            Console.WriteLine($"Properties : {LogProperties.Format(e.Properties)}");
 
         Console.WriteLine();
 

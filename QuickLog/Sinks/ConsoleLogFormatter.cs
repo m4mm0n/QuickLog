@@ -19,9 +19,13 @@ internal static class ConsoleLogFormatter
         var timestamp = useLocalTime ? entry.Timestamp.ToLocalTime() : entry.Timestamp;
         var level = entry.Level.ToString();
         var prefix = $"[{timestamp:HH:mm:ss}] [{level}]";
+        var eventText = entry.EventId == LogEventId.None ? string.Empty : $" [{entry.EventId}]";
+        var propertyText = LogProperties.Format(entry.Properties);
+        if (propertyText.Length > 0)
+            propertyText = $" {propertyText}";
         var body = compact
-            ? $"{prefix} {entry.Message}"
-            : $"{prefix} [{entry.MemberName}] [{entry.FilePath}:{entry.LineNumber}] {entry.Message}";
+            ? $"{prefix}{eventText} {entry.Message}{propertyText}"
+            : $"{prefix}{eventText} [{entry.MemberName}] [{entry.FilePath}:{entry.LineNumber}] {entry.Message}{propertyText}";
 
         return ansi ? $"{AnsiFor(entry.Level)}{body}\u001b[0m" : body;
     }

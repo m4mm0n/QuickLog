@@ -1,27 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : ThreadRole.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 06:41:09 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 84DBDB51
- *  
- *  Description    :
- *                   Specifies the functional role assigned to a thread within an application, such as rendering, audio processing, I/O
- *                   operations, or general work.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 84DBDB51
-
-namespace QuickLog.Core;
+﻿namespace QuickLog.Core;
 
 /// <summary>
 /// Specifies the functional role assigned to a thread within an application, such as rendering, audio processing, I/O

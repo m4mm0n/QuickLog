@@ -1,25 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : BinaryLogSummaryTests.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-17 20:07:19 +02:00
- *  Last Modified  : 2026-05-17 20:35:51 +02:00
- *  CRC32          : A0EF0181
- *  
- *  Description    :
- *
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: A0EF0181
-
 using QuickLog.Core;
 using QuickLog.Sinks;
 using QuickLog.Utilities;

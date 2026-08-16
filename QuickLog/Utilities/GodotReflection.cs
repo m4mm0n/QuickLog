@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 
 namespace QuickLog.Utilities;
 
@@ -26,6 +27,14 @@ internal static class GodotReflection
                       n.StartsWith("Godot", StringComparison.OrdinalIgnoreCase));
     }
 
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2057",
+        Justification = "Optional Godot types are resolved by runtime name and all failures use a safe fallback.")]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2026",
+        Justification = "Optional Godot assembly scanning is best-effort and all failures use a safe fallback.")]
     public static Type? ResolveType(string fullName)
     {
         foreach (var assemblyName in KnownAssemblyQualifiedPrefixes)
@@ -56,6 +65,10 @@ internal static class GodotReflection
         return null;
     }
 
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2075",
+        Justification = "Optional Godot method lookup is best-effort and callers provide a safe fallback.")]
     public static MethodInfo? ResolveStaticMethod(string typeName, string methodName, Type[] parameterTypes)
     {
         try

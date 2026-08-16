@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : TraceLogger.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2024-10-06 09:02:53 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 6086F54D
- *  
- *  Description    :
- *                   A logger that outputs logs to the system trace, typically used for debugging and tracing method execution.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 6086F54D
-
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace QuickLog.Loggers;
@@ -89,12 +67,11 @@ public class TraceLogger : IQuickLog
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
-        var method = new StackTrace().GetFrame(1)?.GetMethod();
-        if (method != null)
-            Log(LogType.Trace,
-                $"Entering method: {method.DeclaringType?.Name}.{method.Name}",
-                callerName,
-                callerFilePath, callerLineNumber);
+        Log(LogType.Trace,
+            $"Entering method: {callerName}",
+            callerName,
+            callerFilePath,
+            callerLineNumber);
     }
 
     /// <summary>
@@ -109,14 +86,12 @@ public class TraceLogger : IQuickLog
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0)
     {
-        var method = new StackTrace().GetFrame(1)?.GetMethod();
-        if (method != null)
-        {
-            stopwatch.Stop();
-            Log(LogType.Trace,
-                $"Exiting method: {method.DeclaringType?.Name}.{method.Name}. Execution time: {stopwatch.ElapsedMilliseconds} ms.",
-                callerName, callerFilePath, callerLineNumber);
-        }
+        stopwatch.Stop();
+        Log(LogType.Trace,
+            $"Exiting method: {callerName}. Execution time: {stopwatch.ElapsedMilliseconds} ms.",
+            callerName,
+            callerFilePath,
+            callerLineNumber);
     }
 
     /// <summary>

@@ -1,351 +1,215 @@
-# QuickLog
+# QuickLog 3
 
 [![NuGet](https://img.shields.io/nuget/v/ZLS.QuickLog.svg)](https://www.nuget.org/packages/ZLS.QuickLog)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/ZLS.QuickLog.svg)](https://www.nuget.org/packages/ZLS.QuickLog)
+[![CI](https://github.com/m4mm0n/QuickLog/actions/workflows/ci.yml/badge.svg)](https://github.com/m4mm0n/QuickLog/actions/workflows/ci.yml)
 
-QuickLog is a **high-performance, engine-grade logging system** written in C#.
-It is designed for **deterministic behavior**, **low allocation**, and **post-mortem analysis**,
-making it especially suitable for **game engines, demo engines, tools, and services**.
+QuickLog is a dependency-free logging and diagnostics runtime for games, tools,
+desktop applications, and services. Version 3 adds typed structured events, the
+QLOG v3 binary format, allocation-aware call sites, asynchronous lifecycle APIs,
+compressed retention, richer offline tooling, Native AOT verification, and an
+optional Microsoft logging adapter.
 
-QuickLog deliberately avoids heavy abstractions, reflection, DI containers,
-and message-template complexity. What you get instead is **clarity, control, and speed**.
-
----
+The core package targets `net8.0` and `net10.0`. It has no runtime package
+dependencies and is continuously built on Windows, Linux, and macOS. Android and
+iOS consumers are compile-verified from dedicated mobile target frameworks.
 
 ## Install
 
+Install the standalone core:
+
 ```powershell
-dotnet add package ZLS.QuickLog --version 2.4.0
+dotnet add package ZLS.QuickLog --version 3.0.0
 ```
 
-QuickLog targets `net8.0` and `net10.0`, is verified on Windows and Linux,
-ships with XML documentation, and has no external package dependencies.
+For hosts that already use `Microsoft.Extensions.Logging`, add the separate
+adapter package:
 
----
+```powershell
+dotnet add package ZLS.QuickLog.Extensions.Logging --version 3.0.0
+```
 
-## Quick Start
+`ZLS.QuickLog.Extensions.Logging` depends on the Microsoft logging abstractions;
+`ZLS.QuickLog` itself remains dependency-free.
+
+## Quick start
 
 ```csharp
 using QuickLog;
 using QuickLog.Loggers;
 
-var logger = new QuickLogger(
-    logFilePath: "logs/app.log",
-    consoleLogging: true,
-    fileLogging: true);
+await using var logger = new QuickLogger
+{
+    EnableConsoleLogging = true,
+    EnableAsyncLogging = true,
+    AsyncOnly = true,
+    JsonLogPath = "logs/app.jsonl",
+    EnableAsyncBinaryLogging = true,
+    BinaryLogPath = "logs/app.qlog"
+};
 
-logger.Log(LogType.Info, "Hello QuickLog");
-logger.Log(LogType.Warn, "Something might be wrong");
-logger.Log(LogType.Error, new Exception("Boom"));
+logger.Log(LogType.Info, "QuickLog is online");
+logger.Log(
+    LogType.Info,
+    "Player connected",
+    new LogEventId(1001, "PlayerConnected"),
+    LogProperties.Create(
+        new LogProperty("playerId", 42),
+        new LogProperty("region", "eu-north")));
 
-logger.Dispose();
+await logger.ShutdownAsync(TimeSpan.FromSeconds(5));
 ```
 
 For application-wide setup:
 
 ```csharp
 LogManager.ConfigureDefault(
-    new LoggerOptions()
-        .WithAsyncOnly()
-        .WithJsonLog("logs/app.jsonl")
-        .WithBinaryLog("logs/app.qlog")
-        .WithRotation(maxFileBytes: 16 * 1024 * 1024, maxFiles: 5)
-        .WithRedaction()
-        .WithSpamControl(duplicateThreshold: 8));
+    LoggerOptions.ForEngine("logs")
+        .WithMinimumLevel(LogType.Info)
+        .WithRotation(
+            maxFileBytes: 16 * 1024 * 1024,
+            maxFiles: 8,
+            maxAge: TimeSpan.FromDays(14),
+            maxTotalBytes: 128 * 1024 * 1024,
+            compressRotatedFiles: true));
 
 var log = LogManager.GetDefaultLogger();
-log.Log(LogType.Info, "QuickLog is online");
-
+log.Log(LogType.Info, "Engine startup complete");
 LogManager.Shutdown();
 ```
 
----
+`LoggerOptions.CreateLogger()` creates an independently owned logger without
+changing global `LogManager` state.
 
-## Core Principles
+## What ships in v3
 
-- **Deterministic behavior**
-- **Async-first design**
-- **Bounded memory usage**
-- **No hidden allocations**
-- **Crash-safe logging**
-- **Offline analysis tooling**
-- **Explicit lifecycle control**
-- **Zero external dependencies**
+- Typed event identifiers and immutable structured properties.
+- QLOG v3 records with CRC32 integrity and typed property values.
+- Backward reads for QLOG v1 and v2 files.
+- JSON Lines, text, console, trace, memory, event, and binary sinks.
+- `IsEnabled(LogType)` and a custom interpolated-string handler that avoids
+  evaluating disabled messages.
+- Async-only dispatch with bounded queues and explicit drop policies.
+- `FlushAsync`, `ShutdownAsync`, `IAsyncDisposable`, timeout, and cancellation.
+- Rotation by active-file size, retained-file count, age, and total byte budget.
+- Optional GZip compression for rotated files.
+- Async-flowing scopes, correlations, properties, and `Activity` trace/span IDs.
+- Secret redaction for messages, structured properties, crash reports, and bundles.
+- Crash ownership, fingerprints, recent log tails, state snapshots, and restart guards.
+- Offline inspect, search, replay, repair, merge, report, bundle, and timeline tools.
+- Native AOT and trimming-compatible core paths with explicit reflection boundaries.
+- Windows, Linux, macOS, Android, iOS, tool, service, engine, and Godot profiles.
+- A separate `Microsoft.Extensions.Logging` provider package.
+- Deterministic NuGet packages, XML documentation, portable symbols, package
+  consumer validation, and release checksums.
 
----
+## Structured events
 
-## Features
-
-### Logging Core
-- `IQuickLog` clean interface
-- Strongly typed `LogType`
-- Caller info via compiler services
-- Exception demystification (stack trace clean-up, zero deps)
-- CRC32 integrity checks
-- Async-flowing scopes (`LogScope`)
-- Correlation ids plus `Activity` trace/span capture (`LogContext`)
-- Built-in sensitive value redaction
-- Thread roles (`ThreadContext`)
-
-### Sinks
-- Console
-- File (text)
-- Trace
-- Event-only
-- Memory (circular buffer)
-- Binary (CRC protected)
-
-### Async Pipeline
-- Dedicated background dispatcher
-- Bounded queue
-- Configurable drop policies
-- Severity-aware dropping
-- Thread-role-aware dropping
-- Dispatcher health counters
-- Duplicate message coalescing
-- Async-only mode (no sync IO)
-- Deterministic flush & shutdown
-- Startup banners and shutdown summaries
-- Runtime minimum levels and per-sink thresholds
-- Low-noise helpers: log-once, rate-limited logs, frame hitches, asset markers
-
-### Exception Ownership *(v2.0)*
-- Hook `AppDomain.UnhandledException` and `TaskScheduler.UnobservedTaskException`
-- Log every captured exception automatically
-- Modal popup on Windows (native `MessageBoxW` — zero deps), safe stderr fallback elsewhere
-- Structured JSON crash dump (`crash_*.json`)
-- Auto-restart on fatal exceptions (with loop guard)
-- Recovery delegate for non-fatal task exceptions
-- `ExceptionCaught` event for custom side-effects
-- Per-exception filter delegate
-
-### Godot Integration *(v2.0)*
-- Route `GD.Print`, `GD.PrintErr`, `GD.PushError`, `GD.PushWarning`, GDScript/shader errors through QuickLog
-- Dynamic `Godot.Logger` subclass via `Reflection.Emit` — zero compile-time Godot dependency
-- Manual bridge template for guaranteed Godot 4 C# compatibility
-- Native `OS.Alert()` popup for exception dialogs inside Godot
-- One-liner setup via `LogManager.AttachGodotHooks()`
-
-### Tooling
-- Binary log reader
-- Binary log exporter
-- Binary log query/filtering by level, time, correlation, or text
-- Zero-dependency `QuickLog.Tools` CLI
-- Doctor / inspect / replay / benchmark / bundle commands
-- Source-less launch and passive observe helpers
-- Timeline TUI viewer
-- Colorized output
-- Search + highlighting
-- Level / role toggles
-- Grouping by time slices
-- Filter presets (save/load)
-
-### Linux Support *(v2.4)*
-- XDG-aware log roots via `LoggerOptions.ForLinux(...)`
-- `$XDG_STATE_HOME/<app>/logs` preferred, `~/.local/state/<app>/logs` fallback
-- Ubuntu CI and Linux smoke project coverage
-- Active-log inspection while apps keep JSONL/QLOG files open
-- No Linux-specific runtime dependencies
-
----
-
-## Basic Usage
+Use a stable numeric identifier for machine queries and an optional name for
+human diagnostics. Values are snapshotted before asynchronous dispatch, so later
+dictionary changes cannot alter an already accepted event.
 
 ```csharp
-var logger = new QuickLogger(
-    logFilePath: "logs/app.log",
-    consoleLogging: true,
-    fileLogging: true);
+var properties = LogProperties.Create(
+    new LogProperty("asset", "models/ship.glb"),
+    new LogProperty("attempt", 3),
+    new LogProperty("cached", true),
+    new LogProperty("elapsedMs", 12.5));
 
-logger.Log(LogType.Info,  "Hello QuickLog");
-logger.Log(LogType.Warn,  "Something might be wrong");
-logger.Log(LogType.Error, new Exception("Boom"));
+logger.Log(
+    LogType.Info,
+    "Asset loaded",
+    new LogEventId(1201, "AssetLoaded"),
+    properties);
 ```
 
----
+Supported typed QLOG values include strings, booleans, signed and unsigned
+integers, floating-point numbers, decimals, `DateTime`, `DateTimeOffset`, and
+`Guid`. Other values are captured using invariant text.
 
-## LogManager — Centralized Setup
-
-```csharp
-// Configure once at startup
-LogManager.ConfigureDefault("app.log");
-
-// Get a named logger anywhere in the codebase
-var logger = LogManager.GetLogger("Database");
-var logger = LogManager.GetLogger(typeof(MyClass));
-
-// Access the default logger
-var log = LogManager.GetDefaultLogger();
-```
-
----
-
-## v2.3 Lean Engine Setup
+### Structured scopes
 
 ```csharp
-using QuickLog.Core;
-using QuickLog.Loggers;
-
-LogManager.ConfigureDefault(
-    LoggerOptions.ForEngine("logs")
-        .WithMinimumLevel(LogType.Trace)
-        .WithSinkMinimumLevel("console", LogType.Warn));
-
-var logger = LogManager.GetDefaultLogger();
-var quickLogger = (QuickLogger)logger;
-
-using (LogContext.BeginCorrelation(Guid.NewGuid().ToString("N")))
-using (var session = LogSession.Begin(logger, "startup", quickLogger.SessionId))
+using (LogContext.BeginCorrelation(matchId))
+using (LogScope.Begin(
+    new LogProperty("matchId", matchId),
+    new LogProperty("map", "arena-7")))
 {
-    logger.Log(LogType.Info, "Game boot sequence started");
-    quickLogger.LogOnce("renderer.init", LogType.Info, "Renderer initialized");
-    quickLogger.LogEvery("net.retry", TimeSpan.FromSeconds(30), LogType.Warn, "Retrying lobby server");
-    quickLogger.LogFrameTime(42, TimeSpan.FromMilliseconds(18), TimeSpan.FromMilliseconds(16));
-    session.Bookmark("first-frame");
+    logger.Log(LogType.Info, "Round started", new LogEventId(1300, "RoundStarted"));
+}
+```
+
+Event properties override properties with the same name inherited from the
+current scope. Scope and correlation state flow through async continuations.
+
+### Allocation-aware interpolation
+
+Interpolated expressions are not evaluated when the level is disabled:
+
+```csharp
+if (logger.IsEnabled(LogType.Debug))
+{
+    // Useful for non-interpolated expensive work.
 }
 
-LogManager.Shutdown();
+logger.Log(LogType.Debug, $"Visible chunks: {world.GetVisibleChunkCount()}");
 ```
 
-`ForEngine` enables the dependency-free diagnostics path: async-only dispatch,
-JSON Lines, CRC-protected binary logs, size-based rotation, crash-safe redaction,
-duplicate coalescing, a startup banner, a shutdown summary, and an auto-generated
-session id.
+The second form uses QuickLog's interpolated-string handler automatically. This
+is formatting, not message-template parsing; use structured properties when a
+value must remain independently queryable.
 
-Other lean profiles:
+## Profiles and platform paths
 
 ```csharp
+var engine = LoggerOptions.ForEngine("logs");
 var service = LoggerOptions.ForService("logs");
 var tool = LoggerOptions.ForTool("asset-packer");
 var godot = LoggerOptions.ForGodot("user://logs");
 var linux = LoggerOptions.ForLinux("my-game");
+var macos = LoggerOptions.ForMacOS("my-game");
+var android = LoggerOptions.ForAndroid("my-game", logDirectory: appFilesDirectory);
+var ios = LoggerOptions.ForIOS("my-game", logDirectory: appSupportDirectory);
 ```
 
-`ForLinux("my-game")` writes JSON Lines and QLOG output below
-`$XDG_STATE_HOME/my-game/logs` when `XDG_STATE_HOME` is set, otherwise below
-`~/.local/state/my-game/logs`. Pass `logDirectory` when a service manager,
-container, or launcher owns the output path:
+`ForLinux` prefers `$XDG_STATE_HOME/<app>/logs`, then
+`~/.local/state/<app>/logs`. `ForMacOS` uses `~/Library/Logs/<app>`. Mobile
+profiles use application local data unless the platform host supplies a writable
+directory. Mobile profiles disable console output and process auto-restart is
+reported as unsupported on Android and iOS.
+
+All profiles can be validated before use:
 
 ```csharp
-LogManager.ConfigureDefault(
-    LoggerOptions.ForLinux("my-service", logDirectory: "/var/log/my-service")
-        .WithMinimumLevel(LogType.Info));
-```
-
-Linux smoke check from the repo:
-
-```bash
-dotnet run --project samples/QuickLog.LinuxSmoke -- /tmp/quicklog-linux-smoke
-dotnet run --project QuickLog.Tools -- doctor /tmp/quicklog-linux-smoke --recursive
-```
-
-Validate options before shipping a preset from config:
-
-```csharp
-var result = LoggerOptions.ForEngine("logs").Validate();
-foreach (var issue in result.Issues)
+var validation = options.Validate();
+foreach (var issue in validation.Issues)
     Console.WriteLine($"{issue.Severity} {issue.Code}: {issue.Message}");
 ```
 
----
+## Async pipeline and lifecycle
 
-## Crash State And Fingerprints
-
-```csharp
-LogStateSnapshot.Set("map", "e1m1");
-LogStateSnapshot.Set("phase", "loading");
-
-LogManager.AttachExceptionHooks(new ExceptionHookOptions
-{
-    CrashDump = new CrashDumpOptions
-    {
-        Enabled = true,
-        Redaction = LogRedactionOptions.CrashSafe()
-    }
-});
-```
-
-Crash dumps include a stable fingerprint, a repeat count for duplicate crashes,
-recent log tail, dispatcher stats, and the current state snapshot. State values
-are redacted before they are written.
-
----
-
-## QLOG Attributes
-
-`[QLOG(...)]` marks classes, constructors, and methods for explicit
-dependency-free instrumentation. QuickLog does not weave IL or create proxies;
-you opt in by running the marked method through `QLogRunner` or by adding one
-scope line inside the method.
+The dispatcher owns a bounded queue and a dedicated background thread. Available
+full-queue policies are `DropNewest`, `DropOldest`, `DropBelowLevel`, and
+`DropByThreadRole`.
 
 ```csharp
-public sealed class AssetCompiler
-{
-    [QLOG(LoggingOption.Default)]
-    public void BuildAtlas()
-    {
-        // work
-    }
-}
-
-var compiler = new AssetCompiler();
-QLogRunner.Invoke(logger, compiler.BuildAtlas);
-```
-
-Inside a method, use the scope helper:
-
-```csharp
-[QLOG(QLogOption.Entry | QLogOption.Exit | QLogOption.Timing)]
-public void LoadMap(IQuickLog logger)
-{
-    using var qlog = QLogScope.Enter(logger);
-    // work
-}
-```
-
-Discovery is also dependency-free:
-
-```csharp
-var markedTargets = QLogDiscovery.Scan(typeof(AssetCompiler).Assembly);
-```
-
----
-
-## Async-Only Mode (Recommended for Engines)
-
-```csharp
-logger.AsyncOnly = true;
-logger.EnableAsyncLogging = true;
+var logger = LoggerOptions.ForEngine("logs")
+    .WithAsyncQueueCapacity(16_384)
+    .CreateLogger();
 
 logger.AsyncDropPolicy = AsyncDropPolicy.DropBelowLevel;
-logger.AsyncMinimumLevel = LogType.Error;
+logger.AsyncMinimumLevel = LogType.Warn;
+logger.AsyncProtectedRole = ThreadRole.Audio;
+
+await logger.FlushAsync(cancellationToken);
+await logger.ShutdownAsync(TimeSpan.FromSeconds(5), cancellationToken);
 ```
 
-This ensures:
-- No blocking IO on the game thread
-- No frame hitches
-- Critical logs are never dropped
+`GetStats()` reports capacity, current depth, accepted and written entries,
+drops by reason, sink failures, and the last sink error. Shutdown summaries can
+include these counters.
 
----
-
-## Dispatcher Health
-
-```csharp
-if (LogManager.GetDefaultLogger() is QuickLog.Loggers.QuickLogger quickLogger)
-{
-    var stats = quickLogger.GetStats();
-    Console.WriteLine($"written={stats.Written} dropped={stats.DroppedTotal}");
-}
-```
-
-The dispatcher tracks queue depth, capacity, written entries, dropped entries,
-sink failures, and the last sink error without adding a metrics dependency.
-
----
-
-## Thread Roles
-
-Assign once per thread:
+Assign a role once per specialized thread:
 
 ```csharp
 ThreadContext.Set(ThreadRole.Render);
@@ -353,447 +217,258 @@ ThreadContext.Set(ThreadRole.Audio);
 ThreadContext.Set(ThreadRole.Network);
 ```
 
-All logs from that thread are tagged accordingly, and the async drop policy can
-protect or deprioritize specific roles.
-
----
-
-## Scopes
+## Rotation, retention, and compression
 
 ```csharp
-using (LogScope.Begin("Frame", frameId))
-using (LogContext.BeginCorrelation(matchId))
+var rotation = new LogRotationOptions
 {
-    logger.Log(LogType.Trace, "Rendering frame");
+    MaxFileBytes = 32 * 1024 * 1024,
+    MaxFiles = 10,
+    MaxAge = TimeSpan.FromDays(30),
+    MaxTotalBytes = 256 * 1024 * 1024,
+    RotateOnStartup = false,
+    CompressRotatedFiles = true
+};
+```
+
+Retention applies to text, JSON Lines, and QLOG sinks. The active file is never
+deleted to satisfy a budget; oldest rotations are removed first. Compression is
+performed after a successful rotation and produces `.gz` files.
+
+## QLOG v3
+
+Each QLOG record is independently framed:
+
+1. `QLOG` magic and format version.
+2. UTC timestamp, severity, thread, role, and caller metadata.
+3. Scope, correlation, trace, span, message, and source fields.
+4. Numeric event ID, optional event name, and typed property collection.
+5. CRC32 over the complete record payload.
+
+The reader accepts versions 1, 2, and 3. Merge and repair output always uses
+version 3. Corrupt lengths, excessive property counts, unsupported versions,
+truncated records, bad magic, and CRC failures produce diagnostics instead of
+unbounded allocations.
+
+```csharp
+var entries = BinaryLogReader.Read("logs/app.qlog", stopOnCrcError: false);
+var result = BinaryLogReader.ReadWithDiagnostics("logs/app.qlog");
+
+var retries = BinaryLogQuery.WithEventId("logs/app.qlog", 401);
+var edgeOne = BinaryLogQuery.WithProperty("logs/app.qlog", "host", "edge-1");
+var match = BinaryLogQuery.WithCorrelation("logs/app.qlog", "match-7");
+```
+
+Summaries include levels, top messages, correlations, event counts, and property
+key counts. Text exports and the timeline viewer include structured data.
+
+## Microsoft.Extensions.Logging
+
+The adapter preserves category, `EventId`, message-template state, exceptions,
+and external scopes:
+
+```csharp
+using Microsoft.Extensions.Logging;
+using QuickLog.Extensions.Logging;
+
+await using var quickLogger = LoggerOptions.ForService("logs").CreateLogger();
+using var factory = LoggerFactory.Create(builder =>
+    builder.ClearProviders().AddQuickLog(quickLogger));
+
+var log = factory.CreateLogger("Game.Network");
+using (log.BeginScope(new Dictionary<string, object?> { ["session"] = "alpha" }))
+{
+    log.LogWarning(
+        new EventId(301, "PacketRetry"),
+        "Retrying packet {PacketId} after {DelayMs} ms",
+        17,
+        250);
 }
 ```
 
-Scopes and correlation ids flow through async continuations and are written to
-JSON Lines, binary logs, crash dump log tails, and text exports.
+QuickLog remains the lifecycle owner by default. Pass `disposeLogger: true` only
+when the Microsoft provider should own and dispose the supplied instance.
 
----
-
-## Redaction & Duplicate Control
+## Redaction and duplicate control
 
 ```csharp
-LogManager.ConfigureDefault(
-    new LoggerOptions()
-        .WithAsyncOnly()
-        .WithBinaryLog("logs/app.qlog")
-        .WithRedaction(options => options.SensitiveKeys.Add("session"))
-        .WithSpamControl(duplicateThreshold: 8));
+var options = LoggerOptions.ForEngine("logs")
+    .WithRedaction(redaction => redaction.SensitiveKeys.Add("sessionSecret"))
+    .WithSpamControl(duplicateThreshold: 8);
 ```
 
-Redaction masks common secrets before async sinks and crash dumps see them.
-Duplicate control keeps hot repeated messages from flooding disk by emitting a
-summary entry after the threshold is crossed.
+Built-in presets are `Secrets`, `Network`, `UserData`, and `CrashSafe`.
+Redaction runs before asynchronous sinks and masks configured structured keys as
+well as matching message fragments. Duplicate control coalesces hot repeated
+messages and emits a summary entry after the configured threshold.
 
-Built-in presets keep common cases short:
-
-```csharp
-var secrets = LogRedactionOptions.Secrets();
-var network = LogRedactionOptions.Network();
-var userData = LogRedactionOptions.UserData();
-var crashSafe = LogRedactionOptions.CrashSafe();
-```
-
----
-
-## Exception Ownership *(v2.0)*
-
-QuickLog can take **full ownership** of every unhandled exception in your process —
-logging it, writing a crash dump, showing a popup, and optionally restarting.
-
-### One-liner setup
+## Exception ownership and crash reports
 
 ```csharp
-LogManager.ConfigureDefault("app.log");
-LogManager.AttachExceptionHooks();          // owns all unhandled exceptions from here
-```
+LogStateSnapshot.Set("map", "e1m1");
+LogStateSnapshot.Set("phase", "loading");
 
-### Full options
-
-```csharp
 LogManager.AttachExceptionHooks(new ExceptionHookOptions
 {
-    ShowPopup             = true,
-    ShowStackTraceInPopup = true,
-    ExceptionLogType      = LogType.Crit,
-    PopupTitle            = "My App — Unhandled Exception",
-
-    // Crash dump — written to %TEMP%\QuickLogCrashDumps\crash_*.json
+    ShowPopup = true,
+    MarkTaskExceptionsObserved = true,
     CrashDump = new CrashDumpOptions
     {
-        Enabled      = true,
-        MaxDumpFiles = 10
-    },
-
-    // Auto-restart on fatal AppDomain exceptions
-    Restart = new RestartOptions
-    {
-        EnableAutoRestart  = true,
-        MaxRestartCount    = 3,
-        DelayBeforeRestart = TimeSpan.FromMilliseconds(500),
-
-        // Recovery delegate for non-fatal unobserved task exceptions
-        RecoveryAction = ex =>
-        {
-            if (ex is InvalidOperationException && ex.Message.Contains("connection"))
-            {
-                ResetConnectionPool();
-                return true;   // recovered — skip log/dump/popup
-            }
-            return false;      // not recovered — proceed normally
-        }
-    },
-
-    // Filter: ignore specific exceptions entirely
-    ExceptionFilter = (ex, source) => ex is not OperationCanceledException
-});
-```
-
-### Crash dump format
-
-Each crash is written as a structured JSON file:
-
-```json
-{
-  "Timestamp": "2026-05-11T07:05:42Z",
-  "Source": "AppDomain",
-  "IsTerminating": true,
-  "RestartCount": 0,
-  "Fingerprint": "D7C9E3180B4A71C2",
-  "RepeatCount": 1,
-  "Exception": {
-    "Type": "System.AccessViolationException",
-    "Message": "Critical failure: memory corruption detected.",
-    "StackTrace": "..."
-  },
-  "Process": {
-    "Id": 1234,
-    "Name": "MyApp",
-    "Executable": "C:\\MyApp\\MyApp.exe",
-    "MemoryBytes": 47259648
-  },
-  "Environment": {
-    "MachineName": "WORKSTATION-01",
-    "OsVersion": "Microsoft Windows NT 10.0.26200.0",
-    "RuntimeVersion": "8.0.22"
-  },
-  "RecentLogs": [
-    {
-      "Level": "Error",
-      "Message": "Lost connection to asset server",
-      "Scope": "Frame:18442",
-      "CorrelationId": "match-7"
-    }
-  ],
-  "Dispatcher": {
-    "Written": 128,
-    "DroppedTotal": 0,
-    "SinkFailures": 0
-  },
-  "State": {
-    "map": "e1m1",
-    "phase": "loading"
-  }
-}
-```
-
-### Subscribe to the raw event
-
-```csharp
-ExceptionHookManager.ExceptionCaught += (_, args) =>
-{
-    // args.Exception, args.Source, args.IsTerminating
-    // Set args.SuppressDefaultHandling = true to skip log + popup
-    UploadCrashReport(args.Exception);
-};
-```
-
-### Check restart count
-
-```csharp
-// At startup — know if the process was restarted after a crash
-if (RestartOptions.CurrentRestartCount > 0)
-    logger.Log(LogType.Warn, $"Restarted after crash (attempt #{RestartOptions.CurrentRestartCount})");
-```
-
----
-
-## Godot Integration *(v2.0)*
-
-QuickLog integrates directly with the Godot 4 C# engine — routing all engine output
-through QuickLog and hijacking unhandled exceptions with native `OS.Alert()` dialogs.
-
-### One-liner setup (in your AutoLoad or `_Ready()`)
-
-```csharp
-LogManager.ConfigureDefault("user://logs/game.log");
-LogManager.AttachGodotHooks();
-```
-
-This automatically:
-- Intercepts `GD.Print`, `GD.PrintErr`, `GD.PushError`, `GD.PushWarning`, GDScript errors
-- Hooks all unhandled .NET exceptions with a native `OS.Alert()` popup
-- Writes crash dumps to `%TEMP%\QuickLogCrashDumps` on every fatal exception
-
-### Full options
-
-```csharp
-LogManager.AttachGodotHooks(new GodotLogOptions
-{
-    InterceptPrint       = true,
-    InterceptPrintError  = true,
-    InterceptErrors      = true,
-    InterceptWarnings    = true,
-    InterceptScriptErrors = true,
-
-    PrintLogType        = LogType.Info,
-    PrintErrorLogType   = LogType.Error,
-    ErrorLogType        = LogType.Error,
-    WarningLogType      = LogType.Warn,
-    ScriptErrorLogType  = LogType.Crit,
-
-    HijackExceptions    = true,   // wraps ExceptionHookManager with OS.Alert popup
-    ExceptionOptions    = new ExceptionHookOptions
-    {
-        CrashDump = new CrashDumpOptions { Enabled = true }
+        Enabled = true,
+        MaxDumpFiles = 10,
+        IncludeRecentLogs = true,
+        IncludeDispatcherStats = true,
+        IncludeStateSnapshot = true,
+        Redaction = LogRedactionOptions.CrashSafe()
     }
 });
 ```
 
-### Check if dynamic Logger registration succeeded
+Crash JSON includes exception trees, process and runtime facts, fingerprints,
+duplicate counts, recent messages, event IDs, structured properties, trace
+context, dispatcher health, and an application state snapshot. Windows uses a
+native popup when enabled; other platforms use a safe stderr fallback or a
+caller-provided `IExceptionPopup`.
+
+Auto-restart has a loop guard and is limited to supported desktop/server hosts.
+Use `RestartOptions.IsSupportedOnCurrentPlatform` before presenting restart as
+an available recovery action.
+
+## Godot integration
 
 ```csharp
+LogManager.ConfigureDefault(LoggerOptions.ForGodot("user://logs"));
 LogManager.AttachGodotHooks();
-
-if (!GodotLogInterceptor.IsDynamicSinkRegistered)
-    GD.Print("QuickLog: manual bridge needed — see GodotBridge docs");
 ```
 
-### Manual bridge (guaranteed to work in all Godot 4 C# setups)
+QuickLog can route Godot output and unhandled exceptions without a compile-time
+Godot dependency. Dynamic `Godot.Logger` registration is attempted only when
+runtime code generation is available. Check
+`GodotLogInterceptor.IsDynamicSinkRegistered`; if it is false, implement a small
+`Godot.Logger` subclass that forwards `_LogMessage` to
+`GodotBridge.HandleMessage` and `_LogError` to `GodotBridge.HandleError`.
 
-If `IsDynamicSinkRegistered` is `false`, add these two files to your **Godot project**:
+This reflection/emission path is explicitly optional for trimmed and Native AOT
+applications. The direct bridge remains the deterministic integration boundary.
+
+## QLOG attributes
+
+`[QLOG]` provides explicit entry, exit, timing, and exception markers without
+weaving, proxies, or runtime dependencies:
 
 ```csharp
-// QuickLogSink.cs  (inside your Godot project, NOT in QuickLog)
-public partial class QuickLogSink : Godot.Logger
+public sealed class AssetCompiler
 {
-    public override void _LogMessage(string message, bool error)
-        => GodotBridge.HandleMessage(message, error);
-
-    public override void _LogError(string function, string file, int line,
-        string code, string rationale, bool errorType, int errorTypeValue,
-        Godot.Collections.Array<ScriptBacktrace> scriptBacktraces)
-        => GodotBridge.HandleError(function, file, line, code, rationale, errorTypeValue);
+    [QLOG(QLogOption.Entry | QLogOption.Exit | QLogOption.Timing)]
+    public void BuildAtlas(IQuickLog logger)
+    {
+        using var scope = QLogScope.Enter(logger);
+        // work
+    }
 }
 ```
 
-```csharp
-// In your AutoLoad _Ready():
-OS.AddLogger(new QuickLogSink());
-```
+`QLogDiscovery.Scan(Type)` is trimming-annotated. Assembly-wide discovery needs
+the application to preserve the marker metadata it intends to scan.
 
-Everything else — routing, log levels, crash dumps, popups — is handled automatically.
+## QuickLog.Tools
 
-### Subscribe to Godot log events
-
-```csharp
-GodotLogInterceptor.GodotLogReceived += (_, args) =>
-{
-    // args.Source, args.Message, args.Function, args.File, args.Line
-    // Set args.SuppressLogging = true to skip the QuickLog forward
-};
-```
-
-### Godot file logger
-
-```csharp
-// Writes to user:// when running under Godot, falls back to %LOCALAPPDATA%\GodotUser
-var logger = new GodotFileLogger("game.log", subfolder: "logs");
-Console.WriteLine(logger.IsUsingGodotPath);  // true when inside Godot
-Console.WriteLine(logger.FullPath);
-```
-
----
-
-## Binary Logs & Analysis
-
-### Export to text
-
-```csharp
-BinaryLogExporter.ExportToText("quicklog.bin", "recovered.log");
-```
-
-Text exports include the source location, scope, correlation id, trace id, and
-span id when those fields are present.
-
-### Query
-
-```csharp
-var errors = BinaryLogQuery.WithLevel(
-    "quicklog.bin",
-    LogType.Error | LogType.Crit);
-
-var bootLogs = BinaryLogQuery.ContainingText("quicklog.bin", "boot");
-var matchLogs = BinaryLogQuery.WithCorrelation("quicklog.bin", "match-7");
-```
-
-### Timeline Viewer
-
-```csharp
-BinaryLogTimelineViewer.Run("quicklog.bin");
-```
-
-### Summary, merge, and repair
-
-```csharp
-var summary = BinaryLogSummary.FromFile("logs/app.qlog");
-BinaryLogMerge.Merge(["logs/a.qlog", "logs/b.qlog"], "logs/merged.qlog");
-var repair = BinaryLogRepair.Repair("logs/bad.qlog", "logs/fixed.qlog");
-```
-
-Controls:
-```
-↑ ↓        Navigate
-PgUp/PgDn  Jump
-G          Group by time
-/          Search (highlighted)
-L          Toggle log levels
-R          Toggle thread roles
-F5         Save filter preset
-F9         Load filter preset
-Esc        Exit
-```
-
----
-
-## QuickLog.Tools *(v2.3 Lean Diagnostics)*
-
-`QuickLog.Tools` is a zero-external-dependency companion CLI. It references
-QuickLog, uses only the .NET runtime libraries, and keeps the core logger clean.
-
-Run it from the repo:
+Run the companion CLI directly from the repository:
 
 ```powershell
-# quicklog-test: parses
 dotnet run --project QuickLog.Tools -- doctor logs --recursive
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- inspect logs/app.qlog --level Error --correlation match-7
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- replay logs/app.qlog --to jsonl --out logs/app.replay.jsonl
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- benchmark --iterations 10000 --mode binary
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- bundle --out support.zip --logs logs --crashes crashes --include-env --include-exports
 ```
 
-Lean v2.3 commands:
+| Command | Purpose |
+|---|---|
+| `doctor <path> [--recursive]` | Validate QLOG, JSONL, crash, and rotation artifacts. |
+| `inspect <file>` | Filter and summarize by level, text, correlation, event, property, and time. |
+| `replay <file> --to console|text|jsonl` | Replay or convert QLOG entries. |
+| `tail <file> [--follow]` | Read the end of an active text log. |
+| `grep <pattern> <path>` | Search messages, event IDs, and structured values. |
+| `stats <file>` | Show level, event, property, correlation, and message counts. |
+| `summarize <file> --out summary.json` | Write a machine-readable summary. |
+| `report --out report.html` | Build a static single-file diagnostics report. |
+| `repair <file> --out fixed.qlog` | Salvage valid records from a damaged QLOG. |
+| `merge <a> <b> --out merged.qlog` | Merge logs in timestamp order as QLOG v3. |
+| `timeline <file>` | Open the interactive console timeline viewer. |
+| `redact <input> --out <output>` | Write a masked text-log copy. |
+| `bundle --out support.zip` | Build a bounded support bundle with a manifest. |
+| `benchmark` | Run dependency-free pipeline microbenchmarks. |
+| `launch` / `observe` | Capture owned process sessions or passive metadata samples. |
+| `doctor-config <file>` | Validate serialized logger options. |
+
+Examples with v3 filters:
 
 ```powershell
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- tail logs/app.jsonl --lines 20
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- grep error logs --recursive
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- diff logs/old.qlog logs/new.qlog
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- stats logs/app.qlog
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- redact logs/app.log --out logs/app.clean.log
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- summarize logs/app.qlog --out artifacts/quicklog-summary.json
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- report --out artifacts/quicklog-report.html --logs logs --crashes logs/crashes
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- repair logs/bad.qlog --out logs/fixed.qlog
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- merge logs/a.qlog logs/b.qlog --out logs/merged.qlog
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- timeline logs/app.qlog
-# quicklog-test: parses
-dotnet run --project QuickLog.Tools -- doctor-config logger-options.json
+dotnet run --project QuickLog.Tools -- inspect logs/app.qlog --event PacketRetry --property attempt=3
+dotnet run --project QuickLog.Tools -- grep edge-1 logs --recursive --property host=edge-1
+dotnet run --project QuickLog.Tools -- replay logs/app.qlog --to jsonl --out logs/export.jsonl
 ```
 
-`report` writes one static HTML file with inline CSS and no scripts. `repair`
-scans for valid QLOG records and salvages what can be read; it is a recovery
-tool, not a guarantee that every corrupt byte can be reconstructed.
+Only inspect or launch applications you own or are authorized to diagnose.
 
-### Source-less Diagnostics
+## Native AOT, trimming, and mobile builds
 
-Use `launch` when QuickLog should start the selected app and capture stdout,
-stderr, process lifetime, and QuickLog session artifacts:
+The repository includes executable and compile-time consumer gates:
 
 ```powershell
-dotnet run --project QuickLog.Tools -- launch --out sessions/app --diagnostic-env --wait-for-exit -- dotnet --info
+dotnet publish samples/QuickLog.AotSmoke -c Release -r win-x64 --self-contained true
+dotnet build samples/QuickLog.MobileSmoke -f net10.0-android -c Release
+dotnet build samples/QuickLog.MobileSmoke -f net10.0-ios -c Release
 ```
 
-Use `observe` when the process is already running:
+Core JSON sinks use source-generated metadata. Reflection-based discovery and
+optional Godot integration expose or document their trimming boundaries. CI
+publishes and runs the Native AOT smoke on Windows, Linux, and macOS and compiles
+the Android/iOS consumer on macOS.
+
+These gates verify package consumption and compilation. They do not replace
+simulator, emulator, physical-device, or live Godot project integration tests.
+
+## Building and validating a release
 
 ```powershell
-dotnet run --project QuickLog.Tools -- observe --pid 1234 --duration 10 --out sessions/observe-1234
+dotnet restore QuickLog.sln
+dotnet build QuickLog.sln -c Release --no-restore
+dotnet test QuickLog.Tests/QuickLog.Tests.csproj -c Release --no-build
+dotnet pack QuickLog/QuickLog.csproj -c Release --no-build -o artifacts/nupkgs
+dotnet pack QuickLog.Extensions.Logging/QuickLog.Extensions.Logging.csproj -c Release --no-build -o artifacts/nupkgs
+./scripts/Test-PackageConsumer.ps1 -PackageDirectory ./artifacts/nupkgs
 ```
 
-`observe` is passive. It records process metadata, memory/thread samples, and a
-best-effort diagnostic-port probe. It does not inject code into the process and
-does not claim deep EventPipe capture without the diagnostics client dependency
-that QuickLog intentionally avoids.
+The package validation script checks both target frameworks, XML docs, README,
+changelog, license, portable symbol packages, core dependency policy, adapter
+dependencies, restore from the produced packages, a clean consumer build, and a
+structured runtime round-trip.
 
-### Profiler Helper
+## Compatibility and migration
 
-The profiler command is an experimental helper for CLR profiler environment
-blocks. It does not ship a native profiler DLL.
+- Existing `IQuickLog.Log(LogType, string|Exception, ...)` calls remain valid.
+- `IQuickLog` now also implements `IAsyncDisposable` and exposes default v3 APIs.
+- New binary writes use QLOG v3; the reader continues to accept QLOG v1 and v2.
+- Existing text and JSONL consumers can ignore the added event/property fields.
+- `LogEntry` and `LogEventArgs` add event and property data at the end of their
+  public construction surface.
+- The core remains `net8.0;net10.0` and dependency-free.
+- Microsoft host integration moved into an explicitly optional package boundary.
 
-```powershell
-dotnet run --project QuickLog.Tools -- profiler explain
-dotnet run --project QuickLog.Tools -- profiler env --clsid 00000000-0000-0000-0000-000000000000 --path C:\Tools\Profiler.dll
-```
+## Project status
 
-Only use launch, observe, or profiler settings on applications you own or are
-authorized to inspect.
-
----
-
-## Shutdown
-
-Always shut down explicitly — this flushes async queues, detaches all hooks, and
-ensures no logs are lost:
-
-```csharp
-LogManager.Shutdown();
-```
-
----
-
-## What QuickLog Is NOT
-
-- QuickLog, QuickLog.Tools, and QuickLog.Sample do not carry runtime NuGet package dependencies.
-- The test suite includes a dependency-policy check so this stays visible during release work.
-- Not a DI-based framework
-- Not a message-template logger
-- Not reflection-heavy at runtime
-- Not opinionated about formatting
-- Not hiding behavior behind magic
-
-QuickLog is **infrastructure**, not ceremony.
-
----
+| Area | v3 status |
+|---|---|
+| Core logging and sinks | Release-gated on .NET 8 and .NET 10 |
+| Structured events / QLOG v3 | CRC round-trip and v1/v2 compatibility tested |
+| Async lifecycle | Flush, shutdown, timeout, cancellation, and disposal tested |
+| Rotation and retention | Size, count, age, byte budget, and compression tested |
+| Diagnostics tools | Inspect, replay, query, summary, repair, merge, and report tested |
+| Crash reporting | Structured tails, redaction, fingerprints, and state tested |
+| Native AOT / trimming | Warning-free build plus native process smoke |
+| Windows / Linux / macOS | CI build, test, and native smoke |
+| Android / iOS | Dedicated target-framework consumer compile smoke |
+| Microsoft logging adapter | Separate package and clean consumer smoke |
+| Godot | Direct bridge stable; dynamic registration remains best-effort |
 
 ## License
 
-MIT
-
----
-
-## Status
-
-| Component | Status |
-|---|---|
-| Core logging / sinks | Production-ready |
-| Async pipeline | Production-ready (v2.3 low-noise helpers + health stats) |
-| Binary logs & tooling | Production-ready (v2.3 repair/merge/report utilities) |
-| Exception ownership | Stable (v2.0) |
-| Crash dump writer | Stable (v2.3 fingerprints + state snapshots) |
-| Godot integration | Stable bridge and file logging; dynamic engine sink is best-effort with manual bridge fallback |
-| Linux support | Verified (v2.4 XDG profile + Ubuntu smoke coverage) |
+QuickLog is licensed under the [MIT License](LICENSE).

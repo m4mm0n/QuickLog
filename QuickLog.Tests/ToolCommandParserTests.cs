@@ -24,6 +24,8 @@ public sealed class ToolCommandParserTests
             "--level", "Error",
             "--contains", "needle",
             "--correlation", "corr-1",
+            "--event", "PacketRetry",
+            "--property", "attempt=3",
             "--limit", "20"
         ]);
 
@@ -33,6 +35,8 @@ public sealed class ToolCommandParserTests
         Assert.Equal("Error", command.Level);
         Assert.Equal("needle", command.Contains);
         Assert.Equal("corr-1", command.Correlation);
+        Assert.Equal("PacketRetry", command.Event);
+        Assert.Equal("attempt=3", command.Property);
         Assert.Equal(20, command.Limit);
     }
 
@@ -144,13 +148,14 @@ public sealed class ToolCommandParserTests
     [Fact]
     public void Parse_GrepCommand_ReturnsPatternPathAndRecursiveOption()
     {
-        var result = ToolCommandParser.Parse(["grep", "boom", "logs", "--recursive"]);
+        var result = ToolCommandParser.Parse(["grep", "boom", "logs", "--recursive", "--property", "host"]);
 
         Assert.True(result.Success, result.Error);
         var command = Assert.IsType<GrepToolCommand>(result.Command);
         Assert.Equal("boom", command.Pattern);
         Assert.Equal("logs", command.Path);
         Assert.True(command.Recursive);
+        Assert.Equal("host", command.Property);
     }
 
     [Fact]

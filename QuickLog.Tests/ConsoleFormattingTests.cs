@@ -1,25 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : ConsoleFormattingTests.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-17 20:07:43 +02:00
- *  Last Modified  : 2026-05-17 20:35:51 +02:00
- *  CRC32          : 72FEE737
- *  
- *  Description    :
- *
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 72FEE737
-
 using QuickLog.Core;
 using QuickLog.Sinks;
 using Xunit;

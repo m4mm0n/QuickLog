@@ -4,8 +4,14 @@ using QuickLog.Utilities;
 
 namespace QuickLog.Tools.Commands;
 
+/// <summary>Replays binary log entries to the console, text, or JSON Lines.</summary>
 public static class ReplayCommand
 {
+    /// <summary>Reads a QLOG file and writes its entries to the configured destination.</summary>
+    /// <param name="command">The input path, output format, and optional output path.</param>
+    /// <param name="console">The destination for console replay and status.</param>
+    /// <param name="cancellationToken">A token that cancels replay.</param>
+    /// <returns>A task containing the command result.</returns>
     public static async Task<CommandResult> ExecuteAsync(
         ReplayToolCommand command,
         IToolConsole console,
@@ -23,7 +29,7 @@ public static class ReplayCommand
                 foreach (var entry in BinaryLogReader.Read(command.Path))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    console.WriteLine($"{entry.Timestamp:O} [{entry.Level}] {entry.Message}");
+                    console.WriteLine($"{entry.Timestamp:O} [{entry.Level}] [{entry.EventId}] {entry.Message} {LogProperties.Format(entry.Properties)}".TrimEnd());
                 }
 
                 return CommandResult.Ok();
@@ -75,7 +81,10 @@ public static class ReplayCommand
         scope = string.IsNullOrWhiteSpace(entry.Category) ? null : entry.Category,
         correlation = string.IsNullOrWhiteSpace(entry.CorrelationId) ? null : entry.CorrelationId,
         trace = string.IsNullOrWhiteSpace(entry.TraceId) ? null : entry.TraceId,
-        span = string.IsNullOrWhiteSpace(entry.SpanId) ? null : entry.SpanId
+        span = string.IsNullOrWhiteSpace(entry.SpanId) ? null : entry.SpanId,
+        eventId = entry.EventId == LogEventId.None ? (int?)null : entry.EventId.Id,
+        eventName = entry.EventId.Name,
+        properties = entry.Properties is { Count: > 0 } ? entry.Properties : null
     };
 
     private static void EnsureParent(string path)

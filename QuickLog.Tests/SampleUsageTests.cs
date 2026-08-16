@@ -34,7 +34,7 @@ public sealed class SampleUsageTests : IDisposable
         Assert.True(result.ExitCode == 0, result.StandardError);
         Assert.DoesNotContain("stale-jsonl-marker", await File.ReadAllTextAsync(jsonPath));
         Assert.True(File.Exists(Path.Combine(logDirectory, "quicklog.qlog")));
-        Assert.Contains("QuickLog v2.4 sample", result.StandardOutput);
+        Assert.Contains("QuickLog v3.0 sample", result.StandardOutput);
     }
 
     /// <summary>

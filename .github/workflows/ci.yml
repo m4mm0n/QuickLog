@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         dotnet: [ '10.0.x' ]
-        os: [ windows-latest, ubuntu-latest ]
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
 
     steps:
       - name: Checkout
@@ -37,3 +37,65 @@ jobs:
       - name: Linux smoke
         if: runner.os == 'Linux'
         run: dotnet run --project samples/QuickLog.LinuxSmoke/QuickLog.LinuxSmoke.csproj --configuration Release --no-build -- /tmp/quicklog-linux-smoke
+
+  aot:
+    name: Native AOT (${{ matrix.runtime }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            runtime: win-x64
+          - os: ubuntu-latest
+            runtime: linux-x64
+          - os: macos-latest
+            runtime: osx-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish native smoke
+        run: dotnet publish samples/QuickLog.AotSmoke/QuickLog.AotSmoke.csproj --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output artifacts/aot
+      - name: Run native smoke
+        shell: pwsh
+        run: |
+          $name = if ($IsWindows) { 'QuickLog.AotSmoke.exe' } else { 'QuickLog.AotSmoke' }
+          & (Join-Path 'artifacts/aot' $name) (Join-Path $PWD 'artifacts/aot-output')
+
+  mobile:
+    name: Mobile compile smoke
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore mobile workloads
+        run: dotnet workload restore samples/QuickLog.MobileSmoke/QuickLog.MobileSmoke.csproj
+      - name: Build Android consumer
+        run: dotnet build samples/QuickLog.MobileSmoke/QuickLog.MobileSmoke.csproj --framework net10.0-android --configuration Release
+      - name: Build iOS consumer
+        run: dotnet build samples/QuickLog.MobileSmoke/QuickLog.MobileSmoke.csproj --framework net10.0-ios --configuration Release
+
+  package:
+    name: Package consumer
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore and build
+        run: |
+          dotnet restore QuickLog.sln
+          dotnet build QuickLog.sln --configuration Release --no-restore
+      - name: Pack both packages
+        shell: pwsh
+        run: |
+          dotnet pack QuickLog/QuickLog.csproj --configuration Release --no-build --output artifacts/nupkgs
+          dotnet pack QuickLog.Extensions.Logging/QuickLog.Extensions.Logging.csproj --configuration Release --no-build --output artifacts/nupkgs
+      - name: Validate package layout and consumer
+        shell: pwsh
+        run: ./scripts/Test-PackageConsumer.ps1 -PackageDirectory ./artifacts/nupkgs

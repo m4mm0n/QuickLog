@@ -5,8 +5,14 @@ using QuickLog.Tools.Diagnostics;
 
 namespace QuickLog.Tools.Commands;
 
+/// <summary>Launches an application while capturing process output and session diagnostics.</summary>
 public static class LaunchCommand
 {
+    /// <summary>Starts and optionally waits for an application in a QuickLog diagnostics session.</summary>
+    /// <param name="command">The application, arguments, and session options.</param>
+    /// <param name="console">The destination for launch status and captured output.</param>
+    /// <param name="cancellationToken">A token that cancels launch observation.</param>
+    /// <returns>A task containing the command result.</returns>
     public static async Task<CommandResult> ExecuteAsync(
         LaunchToolCommand command,
         IToolConsole console,

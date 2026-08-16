@@ -1,13 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : BinaryLogReader.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 06:23:50 +01:00
- *  License        : MIT
- * ====================================================================================================
- */
-
 using QuickLog.Core;
 using System.Text;
 
@@ -18,8 +8,6 @@ namespace QuickLog.Utilities;
 /// </summary>
 public static class BinaryLogReader
 {
-    private static readonly byte[] Magic = "QLOG"u8.ToArray();
-
     /// <summary>
     /// Reads log entries from a binary log file at the specified path.
     /// </summary>
@@ -121,7 +109,7 @@ public static class BinaryLogReader
 
             var recordStart = ms.Position;
             var magic = br.ReadBytes(4);
-            if (!magic.SequenceEqual(Magic))
+            if (!magic.SequenceEqual(BinaryLogFormat.Magic))
             {
                 diagnostic = new BinaryLogDiagnostic(offset, BinaryLogDiagnosticKind.InvalidMagic, "QLOG magic was not found.");
                 nextOffset = offset + 1;
@@ -129,7 +117,7 @@ public static class BinaryLogReader
             }
 
             var version = br.ReadInt32();
-            if (version is not (1 or 2))
+            if (version is not (1 or 2 or 3))
             {
                 diagnostic = new BinaryLogDiagnostic(offset, BinaryLogDiagnosticKind.UnsupportedVersion, $"Unsupported QLOG version {version}.");
                 nextOffset = (int)ms.Position;
@@ -142,13 +130,17 @@ public static class BinaryLogReader
             var threadRole = (ThreadRole)br.ReadByte();
             var lineNumber = br.ReadInt32();
 
-            var member = ReadString(br);
-            var file = ReadString(br);
-            var category = ReadString(br);
-            var message = ReadString(br);
-            var correlationId = version >= 2 ? ReadString(br) : null;
-            var traceId = version >= 2 ? ReadString(br) : null;
-            var spanId = version >= 2 ? ReadString(br) : null;
+            var member = BinaryLogFormat.ReadString(br);
+            var file = BinaryLogFormat.ReadString(br);
+            var category = BinaryLogFormat.ReadString(br);
+            var message = BinaryLogFormat.ReadString(br);
+            var correlationId = version >= 2 ? BinaryLogFormat.ReadString(br) : null;
+            var traceId = version >= 2 ? BinaryLogFormat.ReadString(br) : null;
+            var spanId = version >= 2 ? BinaryLogFormat.ReadString(br) : null;
+            var eventId = version >= 3
+                ? new LogEventId(br.ReadInt32(), NullIfEmpty(BinaryLogFormat.ReadString(br)))
+                : LogEventId.None;
+            var properties = version >= 3 ? ReadProperties(br) : LogProperties.Empty;
 
             var recordEnd = ms.Position;
             var storedCrc = br.ReadUInt32();
@@ -177,7 +169,9 @@ public static class BinaryLogReader
                 threadRole,
                 string.IsNullOrEmpty(correlationId) ? null : correlationId,
                 string.IsNullOrEmpty(traceId) ? null : traceId,
-                string.IsNullOrEmpty(spanId) ? null : spanId
+                string.IsNullOrEmpty(spanId) ? null : spanId,
+                eventId,
+                properties
             );
 
             diagnostic = new BinaryLogDiagnostic(offset, BinaryLogDiagnosticKind.None, string.Empty);
@@ -197,26 +191,27 @@ public static class BinaryLogReader
         }
     }
 
-    /// <summary>
-    /// Reads a length-prefixed UTF-8 string from a QLOG record.
-    /// </summary>
-    /// <param name="br">The binary reader positioned at the string length field.</param>
-    /// <returns>The decoded string, or an empty string when the stored length is zero.</returns>
-    private static string ReadString(BinaryReader br)
+    private static IReadOnlyDictionary<string, object?> ReadProperties(BinaryReader reader)
     {
-        var len = br.ReadInt32();
-        if (len < 0)
-            throw new InvalidDataException("String length is negative.");
+        var count = reader.ReadInt32();
+        if (count < 0 || count > BinaryLogFormat.MaximumProperties)
+            throw new InvalidDataException($"QLOG property count {count} is invalid.");
+        if (count == 0)
+            return LogProperties.Empty;
 
-        if (len == 0)
-            return string.Empty;
+        var properties = new Dictionary<string, object?>(count, StringComparer.Ordinal);
+        for (var index = 0; index < count; index++)
+        {
+            var name = BinaryLogFormat.ReadString(reader);
+            if (string.IsNullOrWhiteSpace(name))
+                throw new InvalidDataException("QLOG property names cannot be empty.");
+            properties[name] = BinaryLogValueCodec.Read(reader);
+        }
 
-        var bytes = br.ReadBytes(len);
-        if (bytes.Length != len)
-            throw new EndOfStreamException();
-
-        return Encoding.UTF8.GetString(bytes);
+        return LogProperties.Snapshot(properties);
     }
+
+    private static string? NullIfEmpty(string value) => string.IsNullOrEmpty(value) ? null : value;
 }
 
 /// <summary>

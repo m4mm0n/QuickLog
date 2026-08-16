@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : AsyncLogDispatcher.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 05:50:29 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : B214B0C3
- *  
- *  Description    :
- *                   Provides asynchronous dispatching of log entries to one or more log sinks on a background thread.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: B214B0C3
-
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 
 namespace QuickLog.Core;
 
@@ -31,7 +9,7 @@ namespace QuickLog.Core;
 /// improving performance in multi-threaded scenarios. It ensures that log entries are processed in the order they are
 /// enqueued and written to all configured sinks. This type is not thread-safe for modification of the sinks collection
 /// after construction.</remarks>
-internal sealed class AsyncLogDispatcher : IDisposable
+internal sealed class AsyncLogDispatcher : IDisposable, IAsyncDisposable
 {
     private readonly BlockingCollection<LogEntry> _queue;
     private readonly int _queueCapacity;
@@ -42,7 +20,9 @@ internal sealed class AsyncLogDispatcher : IDisposable
     private long _sinkFailures;
     private long _inFlight;
     private long _processed;
+    private long _pending;
     private string? _lastSinkError;
+    private int _disposed;
 
     /// <summary>
     /// Gets or sets the thread role that is protected from being preempted or interrupted.
@@ -125,11 +105,8 @@ internal sealed class AsyncLogDispatcher : IDisposable
     public void Enqueue(in LogEntry entry)
     {
         // Fast path
-        if (_queue.TryAdd(entry))
-        {
-            Interlocked.Increment(ref _enqueued);
+        if (TryAccept(entry))
             return;
-        }
 
         switch (DropPolicy)
         {
@@ -139,8 +116,13 @@ internal sealed class AsyncLogDispatcher : IDisposable
 
             case AsyncDropPolicy.DropOldest:
                 if (_queue.TryTake(out _))
-                    if (_queue.TryAdd(entry))
-                        Interlocked.Increment(ref _enqueued);
+                {
+                    Interlocked.Decrement(ref _pending);
+                    Interlocked.Increment(ref DroppedTotal);
+                }
+
+                if (!TryAccept(entry))
+                    Interlocked.Increment(ref DroppedTotal);
                 return;
 
             case AsyncDropPolicy.DropBelowLevel:
@@ -152,8 +134,8 @@ internal sealed class AsyncLogDispatcher : IDisposable
                 }
 
                 TrimBelowLevel();
-                if (_queue.TryAdd(entry))
-                    Interlocked.Increment(ref _enqueued);
+                if (!TryAccept(entry))
+                    Interlocked.Increment(ref DroppedTotal);
                 return;
 
             case AsyncDropPolicy.DropByThreadRole:
@@ -167,11 +149,32 @@ internal sealed class AsyncLogDispatcher : IDisposable
                 {
                     // try to free space by dropping other roles
                     TrimByThreadRole();
-                    if (_queue.TryAdd(entry))
-                        Interlocked.Increment(ref _enqueued);
+                    if (!TryAccept(entry))
+                        Interlocked.Increment(ref DroppedTotal);
                 }
                 return;
         }
+    }
+
+    private bool TryAccept(in LogEntry entry)
+    {
+        Interlocked.Increment(ref _pending);
+        try
+        {
+            if (!_queue.TryAdd(entry))
+            {
+                Interlocked.Decrement(ref _pending);
+                return false;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            Interlocked.Decrement(ref _pending);
+            return false;
+        }
+
+        Interlocked.Increment(ref _enqueued);
+        return true;
     }
 
     private void TrimBelowLevel()
@@ -183,8 +186,12 @@ internal sealed class AsyncLogDispatcher : IDisposable
             if (!_queue.TryTake(out var e))
                 return;
 
-            if (e.Level >= MinimumLevel)
-                _queue.TryAdd(e);
+            if (e.Level >= MinimumLevel && _queue.TryAdd(e))
+                continue;
+
+            Interlocked.Decrement(ref _pending);
+            Interlocked.Increment(ref DroppedTotal);
+            Interlocked.Increment(ref DroppedByLevel);
         }
     }
 
@@ -197,8 +204,12 @@ internal sealed class AsyncLogDispatcher : IDisposable
             if (!_queue.TryTake(out var e))
                 return;
 
-            if (e.ThreadRole == ProtectedRole)
-                _queue.TryAdd(e);
+            if (e.ThreadRole == ProtectedRole && _queue.TryAdd(e))
+                continue;
+
+            Interlocked.Decrement(ref _pending);
+            Interlocked.Increment(ref DroppedTotal);
+            Interlocked.Increment(ref DroppedByRole);
         }
     }
 
@@ -227,6 +238,7 @@ internal sealed class AsyncLogDispatcher : IDisposable
             {
                 Interlocked.Increment(ref _processed);
                 Interlocked.Decrement(ref _inFlight);
+                Interlocked.Decrement(ref _pending);
             }
         }
     }
@@ -240,13 +252,25 @@ internal sealed class AsyncLogDispatcher : IDisposable
     /// result in undefined behavior.</remarks>
     public void Flush()
     {
-        while (_queue.Count > 0 ||
-               Interlocked.Read(ref _inFlight) > 0 ||
-               Interlocked.Read(ref _processed) < Interlocked.Read(ref _enqueued))
+        while (Interlocked.Read(ref _pending) > 0)
             Thread.Sleep(1);
 
         foreach (var sink in _sinks)
             sink.Flush();
+    }
+
+    /// <summary>
+    /// Asynchronously waits for queued and in-flight entries, then flushes every sink.
+    /// </summary>
+    /// <param name="cancellationToken">A token that can cancel the wait.</param>
+    /// <returns>An operation that completes after all sinks are flushed.</returns>
+    public async ValueTask FlushAsync(CancellationToken cancellationToken = default)
+    {
+        while (Interlocked.Read(ref _pending) > 0)
+            await Task.Delay(1, cancellationToken).ConfigureAwait(false);
+
+        foreach (var sink in _sinks)
+            await sink.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
     /// <summary>
     /// Releases all resources used by the current instance of the class.
@@ -255,10 +279,31 @@ internal sealed class AsyncLogDispatcher : IDisposable
     /// resources are properly released. After calling this method, the instance should not be used.</remarks>
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
         _queue.CompleteAdding();
         _thread.Join();
 
         foreach (var sink in _sinks)
             sink.Dispose();
+
+        _queue.Dispose();
+    }
+
+    /// <summary>Completes dispatch and releases every sink without blocking the caller thread.</summary>
+    /// <returns>An operation that completes after resources are released.</returns>
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        _queue.CompleteAdding();
+        await Task.Run(_thread.Join).ConfigureAwait(false);
+
+        foreach (var sink in _sinks)
+            await sink.DisposeAsync().ConfigureAwait(false);
+
+        _queue.Dispose();
     }
 }

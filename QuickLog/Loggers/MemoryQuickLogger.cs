@@ -1,27 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : MemoryQuickLogger.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 05:48:19 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 30FD5AEA
- *  
- *  Description    :
- *                   Provides an in-memory implementation of the IQuickLog interface that stores recent log entries up to a specified
- *                   capacity.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 30FD5AEA
-
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using QuickLog.Core;
 
@@ -86,7 +63,9 @@ public sealed class MemoryQuickLogger : IQuickLog
             entry.Category,
             entry.CorrelationId,
             entry.TraceId,
-            entry.SpanId));
+            entry.SpanId,
+            entry.EventId,
+            entry.Properties));
     }
 
     // ------------------------------------------------------------------

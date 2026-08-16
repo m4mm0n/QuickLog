@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\QuickLog\QuickLog.csproj" />
+    <ProjectReference Include="..\QuickLog.Extensions.Logging\QuickLog.Extensions.Logging.csproj" />
     <ProjectReference Include="..\QuickLog.Sample\QuickLog.Sample.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\QuickLog.Tools\QuickLog.Tools.csproj" />
     <ProjectReference Include="..\samples\QuickLog.LinuxSmoke\QuickLog.LinuxSmoke.csproj" ReferenceOutputAssembly="false" />

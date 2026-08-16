@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : BinaryLogExporter.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 06:25:55 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 5B167AF6
- *  
- *  Description    :
- *                   Provides functionality to export binary log files to a human-readable text format.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 5B167AF6
-
-using System.Text;
+﻿using System.Text;
 
 namespace QuickLog.Utilities;
 
@@ -67,6 +45,12 @@ public static class BinaryLogExporter
 
             if (!string.IsNullOrWhiteSpace(entry.SpanId))
                 writer.WriteLine($"    span: {entry.SpanId}");
+
+            if (entry.EventId != LogEventId.None)
+                writer.WriteLine($"    event: {entry.EventId}");
+
+            if (entry.Properties is { Count: > 0 })
+                writer.WriteLine($"    properties: {LogProperties.Format(entry.Properties)}");
         }
     }
 }

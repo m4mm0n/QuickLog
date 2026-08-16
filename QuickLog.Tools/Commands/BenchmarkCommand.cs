@@ -4,8 +4,14 @@ using QuickLog.Loggers;
 
 namespace QuickLog.Tools.Commands;
 
+/// <summary>Measures logging throughput, allocation, output size, and dispatcher counters.</summary>
 public static class BenchmarkCommand
 {
+    /// <summary>Executes a logging benchmark using the requested sink mode and iteration count.</summary>
+    /// <param name="command">The benchmark options.</param>
+    /// <param name="console">The destination for benchmark results.</param>
+    /// <param name="cancellationToken">A token that cancels the benchmark.</param>
+    /// <returns>A task containing the command result.</returns>
     public static Task<CommandResult> ExecuteAsync(
         BenchmarkToolCommand command,
         IToolConsole console,

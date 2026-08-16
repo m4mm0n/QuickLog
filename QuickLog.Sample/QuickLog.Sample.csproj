@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\QuickLog\QuickLog.csproj" />
+    <ProjectReference Include="..\QuickLog.Extensions.Logging\QuickLog.Extensions.Logging.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

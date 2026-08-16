@@ -1,5 +1,6 @@
 using QuickLog.Core;
 using QuickLog.Sinks;
+using System.IO.Compression;
 using Xunit;
 
 namespace QuickLog.Tests;
@@ -92,6 +93,78 @@ public sealed class LogRotationTests : IDisposable
 
         Assert.True(Directory.GetFiles(_dir, "pipe*.jsonl").Length > 1);
         Assert.True(Directory.GetFiles(_dir, "pipe*.qlog").Length > 1);
+    }
+
+    [Fact]
+    public void FileSink_CompressesRotationsAndPreservesReadableContent()
+    {
+        Directory.CreateDirectory(_dir);
+        var path = Path.Combine(_dir, "compressed.log");
+        var options = new LogRotationOptions
+        {
+            MaxFileBytes = 100,
+            MaxFiles = 4,
+            CompressRotatedFiles = true
+        };
+
+        using (var sink = new FileSink(path, 1, options))
+        {
+            for (var index = 0; index < 8; index++)
+                sink.Write(new LogEntry(DateTime.UtcNow, LogType.Info, $"entry-{index}-{new string('x', 48)}",
+                    "test", null, "M", "f.cs", index, 1, ThreadRole.IO));
+        }
+
+        var compressed = Assert.Single(Directory.GetFiles(_dir, "compressed*.log.gz").Take(1));
+        using var file = File.OpenRead(compressed);
+        using var gzip = new GZipStream(file, CompressionMode.Decompress);
+        using var reader = new StreamReader(gzip);
+        Assert.Contains("entry-", reader.ReadToEnd());
+        Assert.Empty(Directory.GetFiles(_dir, "compressed.*.log"));
+    }
+
+    [Fact]
+    public void FileSink_PrunesExpiredRotationsOnStartup()
+    {
+        Directory.CreateDirectory(_dir);
+        var active = Path.Combine(_dir, "aged.log");
+        var old = Path.Combine(_dir, "aged.20200101_000000.log");
+        File.WriteAllText(old, "old");
+        File.SetLastWriteTimeUtc(old, DateTime.UtcNow.AddDays(-10));
+
+        using (new FileSink(active, 1, new LogRotationOptions
+        {
+            MaxFileBytes = 1024,
+            MaxFiles = 5,
+            MaxAge = TimeSpan.FromDays(1)
+        }))
+        { }
+
+        Assert.False(File.Exists(old));
+        Assert.True(File.Exists(active));
+    }
+
+    [Fact]
+    public void FileSink_EnforcesTotalByteBudgetAcrossRotations()
+    {
+        Directory.CreateDirectory(_dir);
+        var path = Path.Combine(_dir, "budget.log");
+        var options = new LogRotationOptions
+        {
+            MaxFileBytes = 140,
+            MaxFiles = 20,
+            MaxTotalBytes = 360
+        };
+
+        using (var sink = new FileSink(path, 1, options))
+        {
+            for (var index = 0; index < 30; index++)
+                sink.Write(new LogEntry(DateTime.UtcNow, LogType.Info, new string('z', 70),
+                    "test", null, "M", "f.cs", index, 1, ThreadRole.IO));
+        }
+
+        var total = Directory.GetFiles(_dir, "budget*").Sum(file => new FileInfo(file).Length);
+        Assert.True(total <= options.MaxTotalBytes);
+        Assert.True(Directory.GetFiles(_dir, "budget*.log").Length < options.MaxFiles);
     }
 
     public void Dispose()

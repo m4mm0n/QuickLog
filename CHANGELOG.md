@@ -6,13 +6,90 @@ This changelog follows Semantic Versioning and Keep a Changelog style sections.
 
 ## Version Provenance
 
-- `2.4.0` is the current Linux support release line.
+- `3.0.0` is the current major release line.
+- `2.4.0` is tagged as `v2.4.0`.
 - `2.3.1` is tagged as `v2.3.1`.
 - `2.3.0` is tagged as `v2.3.0`.
 - `2.2.0` is tagged as `v2.2.0`.
 - `2.1.0` is tagged as `v2.1.0`.
 - `2.0.0` is tagged as `v2.0.0`.
 - Versions before `2.0.0` are retrospective changelog labels. The repository history before `2.0.0` did not record package version metadata or release tags, so those entries describe historical milestones rather than published tags.
+
+## [Unreleased]
+
+No unreleased changes.
+
+## [3.0.0] - 2026-08-16
+
+### Added
+
+- Added stable `LogEventId` values and immutable structured properties across log entries, events, scopes, sinks, crash reports, queries, summaries, exports, replay, and reports.
+- Added `LogProperty` and `LogProperties` helpers for typed value capture, immutable snapshots, deterministic merges, and invariant text formatting.
+- Added async-flowing structured property scopes through `LogScope.Begin(...)` and `LogContext.BeginProperties(...)`.
+- Added QLOG format version 3 with typed property encoding, event identity, record-level CRC32 protection, bounded string lengths, and bounded property counts.
+- Added `BinaryLogQuery.WithEventId(...)` and `BinaryLogQuery.WithProperty(...)`.
+- Added event and property counts to `BinaryLogSummary` and all summary/report surfaces.
+- Added `IQuickLog.IsEnabled(...)` and a custom interpolated-string handler that avoids evaluating disabled interpolated messages.
+- Added structured message and structured exception overloads while preserving the original `IQuickLog.Log(...)` calls.
+- Added `IQuickLog.FlushAsync(...)`, `QuickLogger.ShutdownAsync(...)`, timeout and cancellation support, and asynchronous disposal.
+- Added retention by rotated-file age and total byte budget.
+- Added optional GZip compression for newly rotated text, JSON Lines, and QLOG files.
+- Added unique high-resolution rotation names to prevent same-timestamp overwrite collisions.
+- Added `LoggerOptions.CreateLogger()` for independently owned, fully configured instances.
+- Added portable macOS, Android, and iOS profiles with deterministic writable-path resolution.
+- Added explicit current-platform auto-restart support reporting and a mobile restart guard.
+- Added runtime code-generation guards for optional dynamic Godot logger registration.
+- Added source-generated JSON metadata for trimming-safe JSON Lines and crash report serialization.
+- Added trim annotations and documented reflection boundaries for discovery, stack formatting, and optional Godot integration.
+- Added `ZLS.QuickLog.Extensions.Logging`, a separate Microsoft logging provider that forwards categories, event identifiers, structured state, exceptions, and external scopes.
+- Added executable Native AOT consumer coverage and Android/iOS target-framework consumer projects.
+- Added deterministic portable symbol packages for both NuGet packages.
+- Added clean-package layout, dependency, restore, build, and runtime consumer validation.
+- Added cross-platform Native AOT release gates, mobile compile gates, curated release notes, release checksums, and both NuGet packages to the release workflow.
+- Added a repository-level MIT license file.
+
+### Changed
+
+- Changed package, assembly, file, and release metadata to `3.0.0`.
+- Changed new binary writes, merge output, and repair output to QLOG v3 while retaining QLOG v1 and v2 reads.
+- Changed JSON Lines output to include `eventId`, `eventName`, and typed `properties` fields.
+- Changed console, file, trace, text export, timeline, and replay output to include event and property data when present.
+- Changed structured redaction to mask sensitive property names before entries reach asynchronous sinks or crash artifacts.
+- Changed crash dump recent-log entries to include event identity and redacted structured properties.
+- Changed async dispatcher completion accounting to track accepted-but-not-finished entries directly.
+- Changed drop-policy accounting to include entries removed while trimming a full queue.
+- Changed stack fingerprints to use available exception stack text without requiring reflected method metadata.
+- Changed method entry/exit tracing to use compiler-provided caller names instead of runtime stack reflection.
+- Changed logger option construction so global and independently owned loggers share one configuration path.
+- Changed package discovery tags and platform documentation for Windows, Linux, macOS, Android, and iOS.
+- Changed CI to test Windows, Linux, and macOS and to validate packages, Native AOT executables, Android consumers, and iOS consumers.
+- Changed release artifacts to include core and adapter packages, portable symbols, combined binaries, curated notes, and SHA-256 hashes.
+- Kept Android and iOS support on the portable `net8.0` and `net10.0` core assets; mobile target frameworks validate package consumption without adding mobile runtime dependencies to the core.
+
+### Fixed
+
+- Fixed a flush race where the consumer could remove an entry from the queue immediately before marking it in flight, allowing shutdown to return before sink accounting completed.
+- Fixed flush completion after `DropOldest` or queue trimming removed an already accepted entry.
+- Fixed structured exception events in async-only mode so event identifiers and properties are retained.
+- Fixed async-only `LogEvent` callbacks so structured metadata, scope, correlation, trace, and span data are preserved.
+- Fixed filters so they can inspect the fully merged structured event instead of an incomplete pre-dispatch view.
+- Fixed rotated-file naming so rapid consecutive rotations cannot overwrite an earlier rotation.
+- Fixed QLOG readers so corrupt string lengths and property counts fail with format diagnostics instead of requesting unbounded buffers.
+
+### Compatibility
+
+- Existing message and exception logging calls remain source-compatible.
+- Existing QLOG v1 and v2 files remain readable.
+- Existing JSONL consumers can ignore the additional v3 fields.
+- The core package continues to target `net8.0` and `net10.0` with no runtime package dependencies.
+- Optional Microsoft host integration is isolated in `ZLS.QuickLog.Extensions.Logging`.
+
+### Verification
+
+- Release builds require zero compiler and trim-analyzer warnings.
+- The repository validates QLOG v1/v2/v3 compatibility, structured redaction, async shutdown, retention/compression, tooling filters, crash propagation, and adapter behavior.
+- Native AOT executables are published and run on Windows, Linux, and macOS.
+- Android and iOS consumers are compiled from `net10.0-android` and `net10.0-ios`; simulator, emulator, physical-device, and live Godot project checks remain integration responsibilities.
 
 ## [2.4.0] - 2026-05-23
 
@@ -117,7 +194,6 @@ This changelog follows Semantic Versioning and Keep a Changelog style sections.
 - Added `quicklog launch` for starting selected applications and capturing stdout, stderr, process lifetime, and QuickLog session artifacts.
 - Added `quicklog observe` for passive, source-less process metadata sampling.
 - Added `quicklog profiler explain` and `quicklog profiler env` as experimental CLR profiler environment helpers.
-- Added design and implementation planning docs for the zero-dependency diagnostics tooling.
 - Added tests for parser behavior, binary utility behavior, rotation, dispatcher stats, crash tails, redaction, spam control, tool commands, process launch/observe, profiler helpers, and packaging-sensitive flows.
 
 ### Changed

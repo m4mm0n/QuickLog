@@ -1,38 +1,21 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : IQuickLog.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2024-10-06 09:02:53 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : EF1D6A91
- *  
- *  Description    :
- *                   Interface for QuickLog's various adoptions
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: EF1D6A91
-
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace QuickLog;
 
 /// <summary>
 /// Interface for QuickLog's various adoptions
 /// </summary>
-public interface IQuickLog : IDisposable
+public interface IQuickLog : IDisposable, IAsyncDisposable
 {
     /// <summary>
     /// Event handler for the logging events.
     /// </summary>
     event EventHandler<LogEventArgs> LogEvent;
+
+    /// <summary>Returns whether the logger accepts the supplied level.</summary>
+    /// <param name="logType">The level to test.</param>
+    /// <returns><see langword="true"/> when the level is enabled.</returns>
+    bool IsEnabled(LogType logType) => true;
 
     /// <summary>
     /// Logs a message with the specified log type and caller information.
@@ -46,6 +29,48 @@ public interface IQuickLog : IDisposable
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0);
+
+    /// <summary>
+    /// Logs a message with a stable event identifier and structured properties.
+    /// </summary>
+    /// <param name="logType">The type of the log.</param>
+    /// <param name="message">The log message.</param>
+    /// <param name="eventId">The stable event identifier.</param>
+    /// <param name="properties">The structured properties.</param>
+    /// <param name="callerName">The compiler-provided caller name.</param>
+    /// <param name="callerFilePath">The compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">The compiler-provided caller line number.</param>
+    void Log(
+        LogType logType,
+        string message,
+        LogEventId eventId,
+        IReadOnlyDictionary<string, object?>? properties = null,
+        [CallerMemberName] string callerName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        var suffix = LogProperties.Format(properties);
+        Log(logType, suffix.Length == 0 ? message : $"{message} {suffix}", callerName, callerFilePath, callerLineNumber);
+    }
+
+    /// <summary>
+    /// Logs an interpolated message without evaluating formatted values when the level is disabled.
+    /// </summary>
+    /// <param name="logType">The type of the log.</param>
+    /// <param name="message">The lazily built interpolated message.</param>
+    /// <param name="callerName">The compiler-provided caller name.</param>
+    /// <param name="callerFilePath">The compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">The compiler-provided caller line number.</param>
+    void Log(
+        LogType logType,
+        [InterpolatedStringHandlerArgument("", "logType")] ref QuickLogInterpolatedStringHandler message,
+        [CallerMemberName] string callerName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        if (IsEnabled(logType))
+            Log(logType, message.GetFormattedText(), callerName, callerFilePath, callerLineNumber);
+    }
 
     /// <summary>
     /// Logs an exception with the specified log type and caller information.
@@ -73,4 +98,40 @@ public interface IQuickLog : IDisposable
         [CallerMemberName] string callerName = "",
         [CallerFilePath] string callerFilePath = "",
         [CallerLineNumber] int callerLineNumber = 0);
+
+    /// <summary>Logs a message and exception with a stable event identifier and structured properties.</summary>
+    /// <param name="logType">The type of the log.</param>
+    /// <param name="message">The log message.</param>
+    /// <param name="exception">The exception related to the log.</param>
+    /// <param name="eventId">The stable event identifier.</param>
+    /// <param name="properties">The structured properties.</param>
+    /// <param name="callerName">The compiler-provided caller name.</param>
+    /// <param name="callerFilePath">The compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">The compiler-provided caller line number.</param>
+    void Log(
+        LogType logType,
+        string message,
+        Exception exception,
+        LogEventId eventId,
+        IReadOnlyDictionary<string, object?>? properties = null,
+        [CallerMemberName] string callerName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        var detail = $"{message}{Environment.NewLine}{exception}";
+        Log(logType, detail, eventId, properties, callerName, callerFilePath, callerLineNumber);
+    }
+
+    /// <summary>Flushes pending entries asynchronously.</summary>
+    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <returns>An operation that completes after pending entries are flushed.</returns>
+    ValueTask FlushAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
+    /// <summary>Disposes the logger asynchronously.</summary>
+    /// <returns>An operation that completes after disposal.</returns>
+    ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        Dispose();
+        return ValueTask.CompletedTask;
+    }
 }

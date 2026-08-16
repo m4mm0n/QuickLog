@@ -5,8 +5,14 @@ using QuickLog.Utilities;
 
 namespace QuickLog.Tools.Commands;
 
+/// <summary>Creates a bounded, optionally redacted diagnostics archive.</summary>
 public static class BundleCommand
 {
+    /// <summary>Collects configured logs, crashes, exports, and environment details into a ZIP archive.</summary>
+    /// <param name="command">The bundle inputs and output options.</param>
+    /// <param name="console">The destination for command status.</param>
+    /// <param name="cancellationToken">A token that cancels bundle creation.</param>
+    /// <returns>A task containing the command result.</returns>
     public static Task<CommandResult> ExecuteAsync(
         BundleToolCommand command,
         IToolConsole console,

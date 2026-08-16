@@ -5,29 +5,38 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
 
     <PackageId>ZLS.QuickLog</PackageId>
-    <Version>2.4.0</Version>
-    <AssemblyVersion>2.4.0.0</AssemblyVersion>
-    <FileVersion>2.4.0.0</FileVersion>
-    <PackageVersion>2.4.0</PackageVersion>
+    <Version>3.0.0</Version>
+    <AssemblyVersion>3.0.0.0</AssemblyVersion>
+    <FileVersion>3.0.0.0</FileVersion>
+    <PackageVersion>3.0.0</PackageVersion>
 
     <Product>QuickLog</Product>
     <Company>ZeroLinez Softworx</Company>
     <Authors>Geir Gustavsen</Authors>
     <Copyright>Copyright © ZeroLinez Softworx 2024–2026</Copyright>
     <Description>High-performance, engine-grade logging with exception ownership, crash dumps, auto-restart, and Godot integration. Zero external dependencies.</Description>
-    <PackageTags>logging;gamedev;godot;linux;exceptions;crash-dump;async</PackageTags>
+    <PackageTags>logging;gamedev;godot;windows;linux;macos;android;ios;exceptions;crash-dump;async</PackageTags>
     <RepositoryUrl>https://github.com/m4mm0n/QuickLog</RepositoryUrl>
     <PackageProjectUrl>https://github.com/m4mm0n/QuickLog</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>QuickLog v2.4.0 adds verified Linux support with XDG-aware log profiles, Ubuntu CI and smoke coverage, active-log reader hardening, strict CLI option validation, and clean sample reruns. Zero runtime dependencies.</PackageReleaseNotes>
+    <PackageReleaseNotes>QuickLog v3.0.0 adds typed structured events, QLOG v3 with legacy reads, allocation-aware logging, async lifecycle APIs, compressed retention, richer diagnostics tools, portable profiles, and release-grade AOT and package verification. The core remains dependency-free.</PackageReleaseNotes>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <DebugType>portable</DebugType>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\CHANGELOG.md" Pack="true" PackagePath="\" />
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>

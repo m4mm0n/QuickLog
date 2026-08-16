@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
+    <IsPackable>true</IsPackable>
+
+    <PackageId>ZLS.QuickLog.Extensions.Logging</PackageId>
+    <Version>3.0.0</Version>
+    <AssemblyVersion>3.0.0.0</AssemblyVersion>
+    <FileVersion>3.0.0.0</FileVersion>
+    <PackageVersion>3.0.0</PackageVersion>
+    <Product>QuickLog Extensions Logging</Product>
+    <Company>ZeroLinez Softworx</Company>
+    <Authors>Geir Gustavsen</Authors>
+    <Copyright>Copyright © ZeroLinez Softworx 2024–2026</Copyright>
+    <Description>Microsoft.Extensions.Logging provider for the dependency-free QuickLog core.</Description>
+    <PackageTags>logging;microsoft-extensions-logging;structured-logging;quicklog</PackageTags>
+    <RepositoryUrl>https://github.com/m4mm0n/QuickLog</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/m4mm0n/QuickLog</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>QuickLog v3.0.0 adapter for Microsoft.Extensions.Logging with structured state, event identifiers, scopes, and async-aware ownership.</PackageReleaseNotes>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\QuickLog\QuickLog.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\CHANGELOG.md" Pack="true" PackagePath="\" />
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

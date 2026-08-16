@@ -26,6 +26,14 @@ public sealed record BinaryLogSummary(
     IReadOnlyList<BinaryLogMessageCount> TopMessages,
     IReadOnlyList<string> Correlations)
 {
+    /// <summary>Gets counts by stable event identifier.</summary>
+    public IReadOnlyDictionary<string, int> EventCounts { get; init; } =
+        new Dictionary<string, int>(StringComparer.Ordinal);
+
+    /// <summary>Gets counts by structured-property name.</summary>
+    public IReadOnlyDictionary<string, int> PropertyCounts { get; init; } =
+        new Dictionary<string, int>(StringComparer.Ordinal);
+
     /// <summary>
     /// Builds a summary from in-memory entries.
     /// </summary>
@@ -54,13 +62,27 @@ public sealed record BinaryLogSummary(
             .Cast<string>()
             .ToList();
 
+        var eventCounts = list
+            .Where(entry => entry.EventId != LogEventId.None)
+            .GroupBy(entry => entry.EventId.ToString(), StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+        var propertyCounts = list
+            .SelectMany(entry => entry.Properties?.Keys ?? [])
+            .GroupBy(name => name, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
         return new BinaryLogSummary(
             list.Count,
             list.Count == 0 ? null : list.First().Timestamp,
             list.Count == 0 ? null : list.Last().Timestamp,
             levelCounts,
             topMessages,
-            correlations);
+            correlations)
+        {
+            EventCounts = eventCounts,
+            PropertyCounts = propertyCounts
+        };
     }
 
     /// <summary>

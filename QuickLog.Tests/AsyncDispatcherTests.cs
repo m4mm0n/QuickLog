@@ -1,25 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : AsyncDispatcherTests.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11 22:17:40 +02:00
- *  Last Modified  : 2026-05-17 20:35:10 +02:00
- *  CRC32          : E27DDCA5
- *  
- *  Description    :
- *
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: E27DDCA5
-
 using QuickLog.Loggers;
 using QuickLog.Core;
 using Xunit;
@@ -145,6 +123,53 @@ public sealed class AsyncDispatcherTests
         Assert.Contains(nameof(InvalidOperationException), stats.LastSinkError);
     }
 
+    [Fact]
+    public async Task FlushAsync_CompletesAfterDropOldestRemovedAnAcceptedEntry()
+    {
+        using var gate = new ManualResetEventSlim();
+        using var sink = new BlockingSink(gate);
+        await using var dispatcher = new AsyncLogDispatcher([sink], queueCapacity: 1)
+        {
+            DropPolicy = AsyncDropPolicy.DropOldest
+        };
+        var first = Entry("first");
+        var second = Entry("second");
+        var third = Entry("third");
+
+        dispatcher.Enqueue(first);
+        Assert.True(sink.Started.Wait(TimeSpan.FromSeconds(2)));
+        dispatcher.Enqueue(second);
+        dispatcher.Enqueue(third);
+        gate.Set();
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        await dispatcher.FlushAsync(timeout.Token);
+
+        Assert.Contains("first", sink.Messages);
+        Assert.Contains("third", sink.Messages);
+    }
+
+    [Fact]
+    public async Task QuickLogger_ShutdownAsync_FlushesStructuredEntries()
+    {
+        var logger = new QuickLogger { EnableAsyncLogging = true, AsyncOnly = true };
+        logger.Log(
+            LogType.Info,
+            "async structured",
+            new LogEventId(17, "Async"),
+            LogProperties.Create(new LogProperty("count", 2)));
+
+        await logger.ShutdownAsync(TimeSpan.FromSeconds(3));
+
+        var entry = Assert.Single(logger.GetRecentLogs());
+        Assert.Equal(new LogEventId(17, "Async"), entry.EventId);
+        Assert.Equal(2, entry.Properties["count"]);
+        await logger.DisposeAsync();
+    }
+
+    private static LogEntry Entry(string message) => new(
+        DateTime.UtcNow, LogType.Info, message, "test", null, "M", "f.cs", 1, 1, ThreadRole.Worker);
+
     private static async Task WaitForLogsAsync(QuickLogger logger, int expectedCount, int timeoutMs = 3000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
@@ -165,5 +190,23 @@ public sealed class AsyncDispatcherTests
         public void Write(in LogEntry entry) => Count++;
         public void Flush() { }
         public void Dispose() { }
+    }
+
+    private sealed class BlockingSink(ManualResetEventSlim gate) : ILogSink
+    {
+        private readonly object _sync = new();
+        public ManualResetEventSlim Started { get; } = new();
+        public List<string> Messages { get; } = [];
+
+        public void Write(in LogEntry entry)
+        {
+            Started.Set();
+            gate.Wait();
+            lock (_sync)
+                Messages.Add(entry.Message);
+        }
+
+        public void Flush() { }
+        public void Dispose() => Started.Dispose();
     }
 }

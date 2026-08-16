@@ -18,12 +18,9 @@ public static class CrashFingerprint
     /// <returns>A short uppercase hexadecimal fingerprint.</returns>
     public static string From(Exception exception)
     {
-        var stack = new System.Diagnostics.StackTrace(exception, false);
-        var frames = stack.GetFrames()?.Take(6)
-            .Select(frame => frame.GetMethod())
-            .Where(method => method is not null)
-            .Select(method => $"{method!.DeclaringType?.FullName}.{method.Name}") ?? [];
-
+        var frames = (exception.StackTrace ?? string.Empty)
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Take(6);
         var basis = $"{exception.GetType().FullName}|{string.Join("|", frames)}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(basis));
         return Convert.ToHexString(hash.AsSpan(0, 8));

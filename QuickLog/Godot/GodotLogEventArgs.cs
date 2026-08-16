@@ -1,13 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : GodotLogEventArgs.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11
- *  License        : MIT — https://opensource.org/licenses/MIT
- * ====================================================================================================
- */
-
 namespace QuickLog.Godot;
 
 /// <summary>
@@ -66,11 +56,11 @@ public sealed class GodotLogEventArgs : EventArgs
     internal GodotLogEventArgs(GodotLogSource source, string message, LogType loggingType,
         string function = "", string file = "", int line = 0)
     {
-        Source      = source;
-        Message     = message;
+        Source = source;
+        Message = message;
         LoggingType = loggingType;
-        Function    = function;
-        File        = file;
-        Line        = line;
+        Function = function;
+        File = file;
+        Line = line;
     }
 }

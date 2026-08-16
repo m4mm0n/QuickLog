@@ -1,13 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : GodotBridge.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11
- *  License        : MIT — https://opensource.org/licenses/MIT
- * ====================================================================================================
- */
-
 namespace QuickLog.Godot;
 
 /// <summary>
@@ -47,10 +37,10 @@ public static class GodotBridge
 
     // ── Godot ErrorType enum values (matches Godot.Logger.ErrorType) ──────────
     // Error=0, Warning=1, Script=2, Shader=3
-    private const int ErrorTypeError   = 0;
+    private const int ErrorTypeError = 0;
     private const int ErrorTypeWarning = 1;
-    private const int ErrorTypeScript  = 2;
-    private const int ErrorTypeShader  = 3;
+    private const int ErrorTypeScript = 2;
+    private const int ErrorTypeShader = 3;
 
     /// <summary>
     /// Raised whenever a Godot log entry is received, before it is forwarded to QuickLog.
@@ -65,7 +55,7 @@ public static class GodotBridge
     {
         lock (_lock)
         {
-            _logger  = logger;
+            _logger = logger;
             _options = options;
         }
     }
@@ -95,9 +85,9 @@ public static class GodotBridge
         bool intercept = error ? opts.InterceptPrintError : opts.InterceptPrint;
         if (!intercept) return;
 
-        var source     = error ? GodotLogSource.PrintError : GodotLogSource.Print;
-        var logType    = error ? opts.PrintErrorLogType    : opts.PrintLogType;
-        var args       = new GodotLogEventArgs(source, message, logType);
+        var source = error ? GodotLogSource.PrintError : GodotLogSource.Print;
+        var logType = error ? opts.PrintErrorLogType : opts.PrintLogType;
+        var args = new GodotLogEventArgs(source, message, logType);
 
         try { GodotLogReceived?.Invoke(null, args); } catch { }
         if (args.SuppressLogging) return;
@@ -129,17 +119,17 @@ public static class GodotBridge
 
         var (source, logType, intercept) = errorTypeValue switch
         {
-            ErrorTypeError   => (GodotLogSource.PushError,    opts.ErrorLogType,       opts.InterceptErrors),
-            ErrorTypeWarning => (GodotLogSource.PushWarning,  opts.WarningLogType,     opts.InterceptWarnings),
-            ErrorTypeScript  => (GodotLogSource.ScriptError,  opts.ScriptErrorLogType, opts.InterceptScriptErrors),
-            ErrorTypeShader  => (GodotLogSource.ShaderError,  opts.ScriptErrorLogType, opts.InterceptScriptErrors),
-            _                => (GodotLogSource.PushError,    opts.ErrorLogType,       opts.InterceptErrors)
+            ErrorTypeError => (GodotLogSource.PushError, opts.ErrorLogType, opts.InterceptErrors),
+            ErrorTypeWarning => (GodotLogSource.PushWarning, opts.WarningLogType, opts.InterceptWarnings),
+            ErrorTypeScript => (GodotLogSource.ScriptError, opts.ScriptErrorLogType, opts.InterceptScriptErrors),
+            ErrorTypeShader => (GodotLogSource.ShaderError, opts.ScriptErrorLogType, opts.InterceptScriptErrors),
+            _ => (GodotLogSource.PushError, opts.ErrorLogType, opts.InterceptErrors)
         };
 
         if (!intercept) return;
 
         var message = BuildErrorMessage(source, function, file, line, code, rationale);
-        var args    = new GodotLogEventArgs(source, message, logType, function, file, line);
+        var args = new GodotLogEventArgs(source, message, logType, function, file, line);
 
         try { GodotLogReceived?.Invoke(null, args); } catch { }
         if (args.SuppressLogging) return;
@@ -152,11 +142,11 @@ public static class GodotBridge
     {
         var tag = source switch
         {
-            GodotLogSource.PushError   => "[Godot Error]",
+            GodotLogSource.PushError => "[Godot Error]",
             GodotLogSource.PushWarning => "[Godot Warning]",
             GodotLogSource.ScriptError => "[GDScript Error]",
             GodotLogSource.ShaderError => "[Shader Error]",
-            _                          => "[Godot]"
+            _ => "[Godot]"
         };
 
         var location = !string.IsNullOrWhiteSpace(file)

@@ -1,27 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : MemorySink.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 06:08:37 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 7E5B7459
- *  
- *  Description    :
- *                   Provides an in-memory log sink that writes log entries to a memory-based logger for fast, transient logging
- *                   operations.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 7E5B7459
-
-using QuickLog.Core;
+﻿using QuickLog.Core;
 using QuickLog.Loggers;
 
 namespace QuickLog.Sinks;

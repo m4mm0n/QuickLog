@@ -52,13 +52,13 @@ public sealed class JsonLinesSinkTests : IDisposable
 
         using var doc = JsonDocument.Parse(File.ReadAllLines(_path)[0]);
         var root = doc.RootElement;
-        Assert.Equal("Warn",       root.GetProperty("level").GetString());
-        Assert.Equal("field check",root.GetProperty("msg").GetString());
-        Assert.Equal("MyMethod",   root.GetProperty("member").GetString());
-        Assert.Equal(99,           root.GetProperty("line").GetInt32());
-        Assert.Equal(42,           root.GetProperty("thread").GetInt32());
-        Assert.Equal("Render",     root.GetProperty("role").GetString());
-        Assert.Equal("MyScope",    root.GetProperty("scope").GetString());
+        Assert.Equal("Warn", root.GetProperty("level").GetString());
+        Assert.Equal("field check", root.GetProperty("msg").GetString());
+        Assert.Equal("MyMethod", root.GetProperty("member").GetString());
+        Assert.Equal(99, root.GetProperty("line").GetInt32());
+        Assert.Equal(42, root.GetProperty("thread").GetInt32());
+        Assert.Equal("Render", root.GetProperty("role").GetString());
+        Assert.Equal("MyScope", root.GetProperty("scope").GetString());
     }
 
     [Fact]

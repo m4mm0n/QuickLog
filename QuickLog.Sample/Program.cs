@@ -1,30 +1,10 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : Program.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11 06:58:20 +02:00
- *  Last Modified  : 2026-05-17 20:35:51 +02:00
- *  CRC32          : E4B9E2E8
- *  
- *  Description    :
- *                   Demonstrates attribute-marked work that can be invoked through <see cref="QLogRunner"/>.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: E4B9E2E8
-
 using QuickLog;
 using QuickLog.Core;
 using QuickLog.Exceptions;
 using QuickLog.Loggers;
 using QuickLog.Utilities;
+using QuickLog.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
 const string LogRoot = "logs";
 const string BinaryLogPath = "logs/quicklog.qlog";
@@ -44,7 +24,13 @@ LogStateSnapshot.Set("asset", "none");
 
 LogManager.ConfigureDefault(
     LoggerOptions.ForEngine(LogRoot)
-        .WithMinimumLevel(LogType.Trace));
+        .WithMinimumLevel(LogType.Trace)
+        .WithRotation(
+            maxFileBytes: 16 * 1024 * 1024,
+            maxFiles: 8,
+            maxAge: TimeSpan.FromDays(14),
+            maxTotalBytes: 128 * 1024 * 1024,
+            compressRotatedFiles: true));
 
 LogManager.AttachExceptionHooks(new ExceptionHookOptions
 {
@@ -65,8 +51,22 @@ var quickLogger = (QuickLogger)logger;
 using (LogContext.BeginCorrelation($"sample-{Guid.NewGuid():N}"))
 using (var session = LogSession.Begin(logger, "sample", quickLogger.SessionId))
 {
-    logger.Log(LogType.Info, "QuickLog v2.4 Linux-ready diagnostics sample started");
+    logger.Log(LogType.Info, "QuickLog v3 structured diagnostics sample started");
+    logger.Log(
+        LogType.Info,
+        "Sample session initialized",
+        new LogEventId(3001, "SampleInitialized"),
+        LogProperties.Create(
+            new LogProperty("sessionId", quickLogger.SessionId),
+            new LogProperty("platform", Environment.OSVersion.Platform.ToString())));
     session.Checkpoint("configured");
+
+    using var factory = LoggerFactory.Create(builder =>
+        builder.ClearProviders().AddQuickLog(logger));
+    factory.CreateLogger("QuickLog.Sample").LogInformation(
+        new EventId(3002, "AdapterReady"),
+        "Microsoft logging bridge ready for session {SessionId}",
+        quickLogger.SessionId);
 
     quickLogger.LogOnce("startup.notice", LogType.Info, "This startup notice is written once");
     quickLogger.LogEvery("network.retry", TimeSpan.FromSeconds(30), LogType.Warn, "Retrying matchmaking endpoint");
@@ -98,16 +98,17 @@ using (var session = LogSession.Begin(logger, "sample", quickLogger.SessionId))
 }
 
 var sessionId = quickLogger.SessionId;
-quickLogger.Flush();
+await quickLogger.FlushAsync();
 LogManager.Shutdown();
 
 var entries = BinaryLogReader.Read(BinaryLogPath, stopOnCrcError: false).ToArray();
 BinaryLogExporter.ExportToText(BinaryLogPath, ExportPath);
 var summary = BinaryLogSummary.FromEntries(entries);
 
-Console.WriteLine("=== QuickLog v2.4 sample ===");
+Console.WriteLine("=== QuickLog v3.0 sample ===");
 Console.WriteLine($"Session: {sessionId}");
 Console.WriteLine($"Entries: {summary.EntryCount}");
+Console.WriteLine($"Events:  {summary.EventCounts.Count}");
 Console.WriteLine($"Binary:  {Path.GetFullPath(BinaryLogPath)}");
 Console.WriteLine($"Export:  {Path.GetFullPath(ExportPath)}");
 

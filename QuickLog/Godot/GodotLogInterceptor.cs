@@ -1,15 +1,7 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : GodotLogInterceptor.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11
- *  License        : MIT — https://opensource.org/licenses/MIT
- * ====================================================================================================
- */
-
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
 using QuickLog.Exceptions;
 using QuickLog.Utilities;
 
@@ -70,7 +62,7 @@ public static class GodotLogInterceptor
     /// </summary>
     public static event EventHandler<GodotLogEventArgs>? GodotLogReceived
     {
-        add    => GodotBridge.GodotLogReceived += value;
+        add => GodotBridge.GodotLogReceived += value;
         remove => GodotBridge.GodotLogReceived -= value;
     }
 
@@ -143,10 +135,21 @@ public static class GodotLogInterceptor
     //  Dynamic Godot.Logger registration via Reflection.Emit
     // ─────────────────────────────────────────────────────────────────────────
 
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2072",
+        Justification = "The optional dynamic Godot sink is runtime-guarded and safely skipped when metadata is unavailable.")]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2075",
+        Justification = "The optional dynamic Godot sink is runtime-guarded and safely skipped when metadata is unavailable.")]
     private static void TryRegisterDynamicSink()
     {
         try
         {
+            if (!CanEmitDynamicSink(RuntimeFeature.IsDynamicCodeSupported, RuntimeFeature.IsDynamicCodeCompiled))
+                return;
+
             // Resolve Godot.Logger type from any loaded Godot assembly.
             var loggerType = GodotReflection.ResolveType("Godot.Logger");
             if (loggerType == null) return;
@@ -174,14 +177,18 @@ public static class GodotLogInterceptor
 
             // Cache for cleanup.
             _dynamicSinkInstance = sinkInstance;
-            _removeLoggerMethod  = osType?.GetMethod("RemoveLogger",
+            _removeLoggerMethod = osType?.GetMethod("RemoveLogger",
                 BindingFlags.Public | BindingFlags.Static,
                 binder: null, types: [loggerType], modifiers: null);
         }
         catch { /* dynamic registration is best-effort — swallow all failures */ }
     }
 
-    private static MethodInfo? FindLogMessageMethod(Type loggerType) =>
+    internal static bool CanEmitDynamicSink(bool isDynamicCodeSupported, bool isDynamicCodeCompiled)
+        => isDynamicCodeSupported && isDynamicCodeCompiled;
+
+    private static MethodInfo? FindLogMessageMethod(
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)] Type loggerType) =>
         loggerType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
             .FirstOrDefault(m =>
             {
@@ -194,7 +201,8 @@ public static class GodotLogInterceptor
                        p[1].ParameterType == typeof(bool);
             });
 
-    private static MethodInfo? FindLogErrorMethod(Type loggerType) =>
+    private static MethodInfo? FindLogErrorMethod(
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)] Type loggerType) =>
         loggerType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
             .FirstOrDefault(m =>
             {
@@ -221,7 +229,7 @@ public static class GodotLogInterceptor
         finally
         {
             _dynamicSinkInstance = null;
-            _removeLoggerMethod  = null;
+            _removeLoggerMethod = null;
         }
     }
 
@@ -229,11 +237,19 @@ public static class GodotLogInterceptor
     //  IL emission — QuickLogGodotSink : Godot.Logger
     // ─────────────────────────────────────────────────────────────────────────
 
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2067",
+        Justification = "Reflection.Emit is runtime-guarded and the optional integration safely falls back to the manual bridge.")]
+    [UnconditionalSuppressMessage(
+        "Aot",
+        "IL3050",
+        Justification = "Reflection.Emit is runtime-guarded and the optional integration safely falls back to the manual bridge.")]
     private static Type? EmitSinkType(Type loggerBase, MethodInfo logMessageMethod, MethodInfo logErrorMethod)
     {
         try
         {
-            var asmName    = new AssemblyName("QuickLogGodotRuntime");
+            var asmName = new AssemblyName("QuickLogGodotRuntime");
             var asmBuilder = AssemblyBuilder.DefineDynamicAssembly(asmName, AssemblyBuilderAccess.Run);
             var modBuilder = asmBuilder.DefineDynamicModule("QuickLogGodotRuntime");
 
@@ -349,13 +365,13 @@ public static class GodotLogInterceptor
 
     private static ExceptionHookOptions BuildDefaultExceptionOptions() => new()
     {
-        ShowPopup             = true,
+        ShowPopup = true,
         ShowStackTraceInPopup = true,
-        ExceptionLogType      = LogType.Crit,
-        PopupTitle            = "Unhandled Exception — QuickLog",
-        CustomPopup           = new GodotAlertPopup(),
+        ExceptionLogType = LogType.Crit,
+        PopupTitle = "Unhandled Exception — QuickLog",
+        CustomPopup = new GodotAlertPopup(),
         MarkTaskExceptionsObserved = false,
         CrashDump = new CrashDumpOptions { Enabled = true },
-        Restart   = new RestartOptions   { EnableAutoRestart = false }
+        Restart = new RestartOptions { EnableAutoRestart = false }
     };
 }

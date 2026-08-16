@@ -4,8 +4,14 @@ using QuickLog.Tools.Diagnostics;
 
 namespace QuickLog.Tools.Commands;
 
+/// <summary>Samples basic health information from a running process.</summary>
 public static class ObserveCommand
 {
+    /// <summary>Observes a process for the configured duration and records a diagnostics session.</summary>
+    /// <param name="command">The process identifier, duration, and output path.</param>
+    /// <param name="console">The destination for observation status.</param>
+    /// <param name="cancellationToken">A token that cancels observation.</param>
+    /// <returns>A task containing the command result.</returns>
     public static async Task<CommandResult> ExecuteAsync(
         ObserveToolCommand command,
         IToolConsole console,

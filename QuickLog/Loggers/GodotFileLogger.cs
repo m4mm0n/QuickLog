@@ -1,32 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : GodotFileLogger.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2025-09-17 20:39:05 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 0367D3C8
- *  
- *  Description    :
- *                   A drop-in logger that writes to Godot's <c>user://</c> directory when the Godot runtime is detected,
- *                   and otherwise falls back to a standard local folder. This class has no compile-time dependency on Godot:
- *                   it uses reflection at runtime to resolve <c>user://</c>.
- *                   <para>
- *                   Internally, this is just a thin adapter around <see cref="FileLogger"/> that resolves the correct absolute
- *                   path. All file I/O and thread-safety are handled by <see cref="FileLogger"/>.
- *                   </para>
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 0367D3C8
-
-using QuickLog.Utilities;
+﻿using QuickLog.Utilities;
 using System.Runtime.CompilerServices;
 
 namespace QuickLog.Loggers;

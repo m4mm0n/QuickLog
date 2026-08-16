@@ -1,27 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : QuickLogger.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2024-10-06 09:02:53 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : E6E76311
- *  
- *  Description    :
- *                   Provides a flexible, multi-sink logger that supports synchronous and asynchronous logging to console, file, event
- *                   handlers, and system trace, with filtering and batching capabilities.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: E6E76311
-
-using QuickLog.Core;
+﻿using QuickLog.Core;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using QuickLog.Sinks;
@@ -40,6 +17,11 @@ namespace QuickLog.Loggers;
 /// release resources and flush pending log entries.</remarks>
 public class QuickLogger : IQuickLog, ICloneable
 {
+    private sealed record StructuredRelayContext(
+        string Message,
+        LogEventId EventId,
+        IReadOnlyDictionary<string, object?> Properties);
+
     /// <summary>
     /// The path of the log-files - used only internally!
     /// </summary>
@@ -65,6 +47,7 @@ public class QuickLogger : IQuickLog, ICloneable
     private readonly DateTime _startedUtc = DateTime.UtcNow;
     private bool _startupEmitted;
     private bool _shutdownSummaryEmitted;
+    private readonly AsyncLocal<StructuredRelayContext?> _structuredRelay = new();
 
     /// <summary>
     /// Enables or disables logging to the console.
@@ -157,7 +140,7 @@ public class QuickLogger : IQuickLog, ICloneable
     /// <summary>Thread role that is shielded from dropping under <see cref="AsyncDropPolicy.DropByThreadRole"/>.</summary>
     public ThreadRole AsyncProtectedRole { get; set; } = ThreadRole.Audio;
 
-    /// <summary>Optional size-based rotation settings for file-backed async sinks.</summary>
+    /// <summary>Optional rotation, retention, and compression settings for file-backed async sinks.</summary>
     public LogRotationOptions? Rotation { get; set; }
 
     /// <summary>Maximum number of entries buffered by the async dispatcher.</summary>
@@ -262,9 +245,36 @@ public class QuickLogger : IQuickLog, ICloneable
     /// </summary>
     /// <param name="sender">The sender of the log event.</param>
     /// <param name="e">The event arguments containing the log details.</param>
-    private void RelayLogEvent(object? sender, LogEventArgs e) => LogEvent?.Invoke(this, e);
+    private void RelayLogEvent(object? sender, LogEventArgs e)
+    {
+        var structured = _structuredRelay.Value;
+        if (structured is null)
+        {
+            LogEvent?.Invoke(this, e);
+            return;
+        }
 
-    private bool ShouldLog(LogType logType) => logType >= MinimumLevel;
+        LogEvent?.Invoke(this, new LogEventArgs(
+            e.LoggingType,
+            structured.Message,
+            e.Exception,
+            e.CallerName,
+            e.CallerFilePath,
+            e.CallerLineNumber,
+            e.Scope,
+            e.CorrelationId,
+            e.TraceId,
+            e.SpanId,
+            structured.EventId,
+            structured.Properties));
+    }
+
+    /// <summary>Returns whether the logger accepts the supplied level.</summary>
+    /// <param name="logType">The level to test.</param>
+    /// <returns><see langword="true"/> when the level meets the configured minimum.</returns>
+    public bool IsEnabled(LogType logType) => logType >= MinimumLevel;
+
+    private bool ShouldLog(LogType logType) => IsEnabled(logType);
 
     private bool AllowsSink(string sinkName, LogType logType)
         => !SinkMinimumLevels.TryGetValue(sinkName, out var minimum) || logType >= minimum;
@@ -294,7 +304,24 @@ public class QuickLogger : IQuickLog, ICloneable
 
     private void Dispatch(LogEventArgs args)
     {
-        if (Filter != null && !Filter(args))
+        var structured = _structuredRelay.Value;
+        var properties = LogProperties.Merge(LogContext.CurrentProperties, structured?.Properties ?? args.Properties);
+        var filterArgs = structured is null && properties.Count == 0
+            ? args
+            : new LogEventArgs(
+                args.LoggingType,
+                structured?.Message ?? args.Message,
+                args.Exception,
+                args.CallerName,
+                args.CallerFilePath,
+                args.CallerLineNumber,
+                LogScope.Current,
+                LogContext.CurrentCorrelationId,
+                LogContext.CurrentTraceId,
+                LogContext.CurrentSpanId,
+                structured?.EventId ?? args.EventId,
+                properties);
+        if (Filter != null && !Filter(filterArgs))
             return;
 
         EnsureAsyncDispatcher();
@@ -303,7 +330,9 @@ public class QuickLogger : IQuickLog, ICloneable
             DateTime.UtcNow,
             args.LoggingType,
             Redact(args.Exception != null
-                ? args.Exception.ToStringDemystified()
+                ? string.IsNullOrWhiteSpace(args.Message)
+                    ? args.Exception.ToStringDemystified()
+                    : $"{args.Message}{Environment.NewLine}{args.Exception.ToStringDemystified()}"
                 : args.Message ?? string.Empty),
             "QuickLogger",
             QuickLog.Core.LogScope.Current,
@@ -314,7 +343,9 @@ public class QuickLogger : IQuickLog, ICloneable
             ThreadContext.Role,
             LogContext.CurrentCorrelationId,
             LogContext.CurrentTraceId,
-            LogContext.CurrentSpanId
+            LogContext.CurrentSpanId,
+            structured?.EventId ?? args.EventId,
+            RedactProperties(properties)
         ));
     }
 
@@ -323,13 +354,16 @@ public class QuickLogger : IQuickLog, ICloneable
         string message,
         string callerName,
         string callerFilePath,
-        int callerLineNumber)
+        int callerLineNumber,
+        LogEventId eventId = default,
+        IReadOnlyDictionary<string, object?>? properties = null)
     {
         if (!EnableAsyncLogging)
             return;
 
         EnsureAsyncDispatcher();
 
+        var mergedProperties = LogProperties.Merge(LogContext.CurrentProperties, properties);
         EnqueueAsyncEntry(new LogEntry(
             DateTime.UtcNow,
             logType,
@@ -343,7 +377,9 @@ public class QuickLogger : IQuickLog, ICloneable
             ThreadContext.Role,
             LogContext.CurrentCorrelationId,
             LogContext.CurrentTraceId,
-            LogContext.CurrentSpanId
+            LogContext.CurrentSpanId,
+            eventId,
+            RedactProperties(mergedProperties)
         ));
     }
 
@@ -351,6 +387,49 @@ public class QuickLogger : IQuickLog, ICloneable
         => Redaction is { Enabled: true } options
             ? new LogRedactor(options).Redact(value)
             : value;
+
+    private IReadOnlyDictionary<string, object?> RedactProperties(
+        IReadOnlyDictionary<string, object?>? properties)
+        => Redaction is { Enabled: true } options
+            ? new LogRedactor(options).RedactProperties(properties)
+            : LogProperties.Snapshot(properties);
+
+    private string FormatForTextSink(string message)
+    {
+        var structured = _structuredRelay.Value;
+        if (structured is null)
+            return message;
+
+        var eventText = structured.EventId == LogEventId.None ? string.Empty : $" [{structured.EventId}]";
+        var properties = LogProperties.Format(structured.Properties);
+        return properties.Length == 0
+            ? $"{message}{eventText}"
+            : $"{message}{eventText} {properties}";
+    }
+
+    private void RaiseAsyncOnlyEvent(
+        LogType logType,
+        string? message,
+        Exception? exception,
+        string callerName,
+        string callerFilePath,
+        int callerLineNumber)
+    {
+        var structured = _structuredRelay.Value;
+        LogEvent?.Invoke(this, new LogEventArgs(
+            logType,
+            structured?.Message ?? message,
+            exception,
+            callerName,
+            callerFilePath,
+            callerLineNumber,
+            LogScope.Current,
+            LogContext.CurrentCorrelationId,
+            LogContext.CurrentTraceId,
+            LogContext.CurrentSpanId,
+            structured?.EventId ?? default,
+            LogProperties.Merge(LogContext.CurrentProperties, structured?.Properties)));
+    }
 
     private void EnqueueAsyncEntry(in LogEntry entry)
     {
@@ -407,8 +486,8 @@ public class QuickLogger : IQuickLog, ICloneable
 
         _asyncDispatcher = new AsyncLogDispatcher(_asyncSinks, AsyncQueueCapacity)
         {
-            DropPolicy    = this.AsyncDropPolicy,
-            MinimumLevel  = AsyncMinimumLevel,
+            DropPolicy = this.AsyncDropPolicy,
+            MinimumLevel = AsyncMinimumLevel,
             ProtectedRole = AsyncProtectedRole
         };
     }
@@ -429,22 +508,18 @@ public class QuickLogger : IQuickLog, ICloneable
         if (!ShouldLog(logType))
             return;
 
+        var textMessage = FormatForTextSink(message);
         if (!AsyncOnly)
         {
             ApplyConsoleOptions();
-            if (EnableConsoleLogging && AllowsSink("console", logType)) _consoleLogger?.Log(logType, message, callerName, callerFilePath, callerLineNumber);
-            if (EnableFileLogging && _fileLogger != null && AllowsSink("file", logType)) _fileLogger.Log(logType, message, callerName, callerFilePath, callerLineNumber);
-            if (EnableEventLogging && AllowsSink("event", logType)) _eventLogger?.Log(logType, message, callerName, callerFilePath, callerLineNumber);
-            if (EnableTraceLogging && AllowsSink("trace", logType)) _traceLogger?.Log(logType, message, callerName, callerFilePath, callerLineNumber);
+            if (EnableConsoleLogging && AllowsSink("console", logType)) _consoleLogger?.Log(logType, textMessage, callerName, callerFilePath, callerLineNumber);
+            if (EnableFileLogging && _fileLogger != null && AllowsSink("file", logType)) _fileLogger.Log(logType, textMessage, callerName, callerFilePath, callerLineNumber);
+            if (EnableEventLogging && AllowsSink("event", logType)) _eventLogger?.Log(logType, textMessage, callerName, callerFilePath, callerLineNumber);
+            if (EnableTraceLogging && AllowsSink("trace", logType)) _traceLogger?.Log(logType, textMessage, callerName, callerFilePath, callerLineNumber);
         }
         else if (RaiseLogEventInAsyncOnly)
         {
-            LogEvent?.Invoke(this, new LogEventArgs(
-                logType,
-                message,
-                callerName,
-                callerFilePath,
-                callerLineNumber));
+            RaiseAsyncOnlyEvent(logType, message, null, callerName, callerFilePath, callerLineNumber);
         }
 
         if (AsyncOnly && EnableAsyncLogging)
@@ -454,7 +529,9 @@ public class QuickLogger : IQuickLog, ICloneable
                 message,
                 callerName,
                 callerFilePath,
-                callerLineNumber);
+                callerLineNumber,
+                _structuredRelay.Value?.EventId ?? default,
+                _structuredRelay.Value?.Properties);
         }
         else
         {
@@ -465,6 +542,97 @@ public class QuickLogger : IQuickLog, ICloneable
                 callerFilePath,
                 callerLineNumber));
         }
+    }
+
+    /// <summary>
+    /// Logs a message with a stable event identifier and structured properties.
+    /// </summary>
+    /// <param name="logType">The type of the log entry.</param>
+    /// <param name="message">The message to log.</param>
+    /// <param name="eventId">The stable event identifier.</param>
+    /// <param name="properties">The structured properties.</param>
+    /// <param name="callerName">The compiler-provided caller name.</param>
+    /// <param name="callerFilePath">The compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">The compiler-provided caller line number.</param>
+    public void Log(
+        LogType logType,
+        string message,
+        LogEventId eventId,
+        IReadOnlyDictionary<string, object?>? properties = null,
+        [CallerMemberName] string callerName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        if (!IsEnabled(logType))
+            return;
+
+        var previous = _structuredRelay.Value;
+        var snapshot = LogProperties.Merge(LogContext.CurrentProperties, properties);
+        _structuredRelay.Value = new StructuredRelayContext(message, eventId, snapshot);
+        try
+        {
+            Log(logType, message, callerName, callerFilePath, callerLineNumber);
+        }
+        finally
+        {
+            _structuredRelay.Value = previous;
+        }
+    }
+
+    /// <summary>Logs a message and exception with a stable event identifier and structured properties.</summary>
+    /// <param name="logType">The type of the log entry.</param>
+    /// <param name="message">The message to log.</param>
+    /// <param name="exception">The exception to log.</param>
+    /// <param name="eventId">The stable event identifier.</param>
+    /// <param name="properties">The structured properties.</param>
+    /// <param name="callerName">The compiler-provided caller name.</param>
+    /// <param name="callerFilePath">The compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">The compiler-provided caller line number.</param>
+    public void Log(
+        LogType logType,
+        string message,
+        Exception exception,
+        LogEventId eventId,
+        IReadOnlyDictionary<string, object?>? properties = null,
+        [CallerMemberName] string callerName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        if (!IsEnabled(logType))
+            return;
+
+        var previous = _structuredRelay.Value;
+        _structuredRelay.Value = new StructuredRelayContext(
+            message,
+            eventId,
+            LogProperties.Merge(LogContext.CurrentProperties, properties));
+        try
+        {
+            Log(logType, message, exception, callerName, callerFilePath, callerLineNumber);
+        }
+        finally
+        {
+            _structuredRelay.Value = previous;
+        }
+    }
+
+    /// <summary>
+    /// Logs an interpolated message without evaluating formatted values when the level is disabled.
+    /// </summary>
+    /// <param name="logType">The type of the log entry.</param>
+    /// <param name="message">The lazily built message.</param>
+    /// <param name="callerName">The compiler-provided caller name.</param>
+    /// <param name="callerFilePath">The compiler-provided caller file path.</param>
+    /// <param name="callerLineNumber">The compiler-provided caller line number.</param>
+    public void Log(
+        LogType logType,
+        [InterpolatedStringHandlerArgument("", "logType")] ref QuickLogInterpolatedStringHandler message,
+        [CallerMemberName] string callerName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        if (IsEnabled(logType))
+            Log(logType, message.GetFormattedText(), callerName, callerFilePath, callerLineNumber);
     }
 
     /// <summary>
@@ -493,12 +661,7 @@ public class QuickLogger : IQuickLog, ICloneable
         }
         else if (RaiseLogEventInAsyncOnly)
         {
-            LogEvent?.Invoke(this, new LogEventArgs(
-                logType,
-                exception,
-                callerName,
-                callerFilePath,
-                callerLineNumber));
+            RaiseAsyncOnlyEvent(logType, null, exception, callerName, callerFilePath, callerLineNumber);
         }
 
         if (AsyncOnly && EnableAsyncLogging)
@@ -508,7 +671,9 @@ public class QuickLogger : IQuickLog, ICloneable
                 exception.ToStringDemystified(),
                 callerName,
                 callerFilePath,
-                callerLineNumber);
+                callerLineNumber,
+                _structuredRelay.Value?.EventId ?? default,
+                _structuredRelay.Value?.Properties);
         }
         else
         {
@@ -548,13 +713,7 @@ public class QuickLogger : IQuickLog, ICloneable
         }
         else if (RaiseLogEventInAsyncOnly)
         {
-            LogEvent?.Invoke(this, new LogEventArgs(
-                logType,
-                message,
-                exception,
-                callerName,
-                callerFilePath,
-                callerLineNumber));
+            RaiseAsyncOnlyEvent(logType, message, exception, callerName, callerFilePath, callerLineNumber);
         }
 
         if (AsyncOnly && EnableAsyncLogging)
@@ -564,7 +723,9 @@ public class QuickLogger : IQuickLog, ICloneable
                 $"Message: {message}\r\nException: {exception.ToStringDemystified()}",
                 callerName,
                 callerFilePath,
-                callerLineNumber);
+                callerLineNumber,
+                _structuredRelay.Value?.EventId ?? default,
+                _structuredRelay.Value?.Properties);
         }
         else
         {
@@ -754,9 +915,9 @@ public class QuickLogger : IQuickLog, ICloneable
     public QuickLogger CloneDeep(string? fileName = null)
     {
         var x = (QuickLogger)Clone();
-        if (fileName != null && !fileName.EndsWith(x.LogPath.ToLower()))
+        if (!string.IsNullOrWhiteSpace(fileName))
         {
-            _fileLogger = new FileLogger(fileName);
+            x._fileLogger = new FileLogger(fileName);
             x.LogPath = Path.GetDirectoryName(fileName) ?? "logs";
         }
 
@@ -769,6 +930,16 @@ public class QuickLogger : IQuickLog, ICloneable
     {
         FlushSpamControl();
         _asyncDispatcher?.Flush();
+    }
+
+    /// <summary>Asynchronously flushes pending entries without blocking the caller thread.</summary>
+    /// <param name="cancellationToken">A token that can cancel the wait.</param>
+    /// <returns>An operation that completes after pending entries are flushed.</returns>
+    public async ValueTask FlushAsync(CancellationToken cancellationToken = default)
+    {
+        FlushSpamControl();
+        if (_asyncDispatcher is not null)
+            await _asyncDispatcher.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -785,6 +956,38 @@ public class QuickLogger : IQuickLog, ICloneable
         Flush();
         _lastStats = _asyncDispatcher?.GetStats();
         _asyncDispatcher?.Dispose();
+        _asyncDispatcher = null;
+        _spamController = null;
+    }
+
+    /// <summary>
+    /// Flushes and shuts down asynchronous logging with optional timeout and cancellation.
+    /// </summary>
+    /// <param name="timeout">The maximum graceful-flush duration, or <see langword="null"/> for no timeout.</param>
+    /// <param name="cancellationToken">A token that can cancel shutdown.</param>
+    /// <returns>An operation that completes after asynchronous resources are released.</returns>
+    public async ValueTask ShutdownAsync(
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var timeoutSource = timeout is { } value && value != Timeout.InfiniteTimeSpan
+            ? new CancellationTokenSource(value)
+            : null;
+        using var linkedSource = timeoutSource is null
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
+        var token = linkedSource?.Token ?? cancellationToken;
+
+        if (EmitShutdownSummary && !_shutdownSummaryEmitted)
+        {
+            _shutdownSummaryEmitted = true;
+            Log(LogType.Info, LogRuntimeSnapshot.Shutdown(_startedUtc, GetStats(), SessionId));
+        }
+
+        await FlushAsync(token).ConfigureAwait(false);
+        _lastStats = _asyncDispatcher?.GetStats();
+        if (_asyncDispatcher is not null)
+            await _asyncDispatcher.DisposeAsync().ConfigureAwait(false);
         _asyncDispatcher = null;
         _spamController = null;
     }
@@ -805,6 +1008,18 @@ public class QuickLogger : IQuickLog, ICloneable
     {
         Shutdown();
 
+        _eventLogger?.Dispose();
+        _consoleLogger?.Dispose();
+        _fileLogger?.Dispose();
+        _traceLogger?.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>Asynchronously flushes and disposes the logger.</summary>
+    /// <returns>An operation that completes after logger resources are released.</returns>
+    public async ValueTask DisposeAsync()
+    {
+        await ShutdownAsync().ConfigureAwait(false);
         _eventLogger?.Dispose();
         _consoleLogger?.Dispose();
         _fileLogger?.Dispose();

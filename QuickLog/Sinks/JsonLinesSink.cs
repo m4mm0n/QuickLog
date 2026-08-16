@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using QuickLog.Core;
 
 namespace QuickLog.Sinks;
@@ -12,12 +11,6 @@ internal sealed class JsonLinesSink : ILogSink
 {
     private readonly RotatingFileWriter _writer;
 
-    private static readonly JsonSerializerOptions _json = new()
-    {
-        WriteIndented = false,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
     public JsonLinesSink(string path, LogRotationOptions? rotation = null)
     {
         _writer = new RotatingFileWriter(path, rotation);
@@ -25,7 +18,7 @@ internal sealed class JsonLinesSink : ILogSink
 
     public void Write(in LogEntry entry)
     {
-        var line = new LogLine(
+        var line = new JsonLogLine(
             entry.Timestamp.ToString("O"),
             entry.Level.ToString(),
             entry.Message,
@@ -37,9 +30,12 @@ internal sealed class JsonLinesSink : ILogSink
             string.IsNullOrEmpty(entry.Category) ? null : entry.Category,
             string.IsNullOrEmpty(entry.CorrelationId) ? null : entry.CorrelationId,
             string.IsNullOrEmpty(entry.TraceId) ? null : entry.TraceId,
-            string.IsNullOrEmpty(entry.SpanId) ? null : entry.SpanId);
+            string.IsNullOrEmpty(entry.SpanId) ? null : entry.SpanId,
+            entry.EventId == LogEventId.None ? null : entry.EventId.Id,
+            entry.EventId.Name,
+            entry.Properties is { Count: > 0 } ? entry.Properties : null);
 
-        _writer.WriteLine(JsonSerializer.Serialize(line, _json));
+        _writer.WriteLine(JsonSerializer.Serialize(line, JsonLinesSerializationContext.Default.JsonLogLine));
     }
 
     public void Flush() => _writer.Flush();
@@ -49,20 +45,4 @@ internal sealed class JsonLinesSink : ILogSink
         Flush();
         _writer.Dispose();
     }
-
-    // ── JSON model ────────────────────────────────────────────────────────────
-
-    private sealed record LogLine(
-        [property: JsonPropertyName("ts")]     string Ts,
-        [property: JsonPropertyName("level")]  string Level,
-        [property: JsonPropertyName("msg")]    string Msg,
-        [property: JsonPropertyName("member")] string Member,
-        [property: JsonPropertyName("file")]   string File,
-        [property: JsonPropertyName("line")]   int Line,
-        [property: JsonPropertyName("thread")] int Thread,
-        [property: JsonPropertyName("role")]   string Role,
-        [property: JsonPropertyName("scope")]  string? Scope,
-        [property: JsonPropertyName("correlation")] string? Correlation,
-        [property: JsonPropertyName("trace")] string? Trace,
-        [property: JsonPropertyName("span")] string? Span);
 }

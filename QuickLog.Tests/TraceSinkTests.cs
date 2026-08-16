@@ -10,7 +10,7 @@ public sealed class TraceSinkTests : IDisposable
     private readonly CapturingTraceListener _listener = new();
 
     public TraceSinkTests() => Trace.Listeners.Add(_listener);
-    public void Dispose()   => Trace.Listeners.Remove(_listener);
+    public void Dispose() => Trace.Listeners.Remove(_listener);
 
     [Fact]
     public void Write_InfoLevel_EmitsTraceInformation()

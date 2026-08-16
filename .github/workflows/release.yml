@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to build (e.g. v2.0.0)'
+        description: 'Release tag to build (e.g. v3.0.0)'
         required: true
-        default: 'v2.0.0'
+        default: 'v3.0.0'
 
 jobs:
   test:
@@ -18,7 +18,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ windows-latest, ubuntu-latest ]
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
 
     steps:
       - name: Checkout
@@ -42,6 +42,25 @@ jobs:
         if: runner.os == 'Linux'
         run: dotnet run --project samples/QuickLog.LinuxSmoke/QuickLog.LinuxSmoke.csproj --configuration Debug --no-build -- /tmp/quicklog-linux-smoke
 
+      - name: Publish native AOT smoke
+        shell: pwsh
+        run: |
+          $runtime = if ($IsWindows) { 'win-x64' } elseif ($IsMacOS) { 'osx-arm64' } else { 'linux-x64' }
+          dotnet publish samples/QuickLog.AotSmoke/QuickLog.AotSmoke.csproj --configuration Release --runtime $runtime --self-contained true --output artifacts/aot
+      - name: Run native AOT smoke
+        shell: pwsh
+        run: |
+          $name = if ($IsWindows) { 'QuickLog.AotSmoke.exe' } else { 'QuickLog.AotSmoke' }
+          & (Join-Path 'artifacts/aot' $name) (Join-Path $PWD 'artifacts/aot-output')
+      - name: Restore mobile workloads
+        if: runner.os == 'macOS'
+        run: dotnet workload restore samples/QuickLog.MobileSmoke/QuickLog.MobileSmoke.csproj
+      - name: Build Android and iOS consumers
+        if: runner.os == 'macOS'
+        run: |
+          dotnet build samples/QuickLog.MobileSmoke/QuickLog.MobileSmoke.csproj --framework net10.0-android --configuration Release
+          dotnet build samples/QuickLog.MobileSmoke/QuickLog.MobileSmoke.csproj --framework net10.0-ios --configuration Release
+
   release:
     name: Release
     needs: test
@@ -61,24 +80,53 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore QuickLog/QuickLog.csproj
+        run: dotnet restore QuickLog.sln
 
       - name: Build
-        run: dotnet build QuickLog/QuickLog.csproj --configuration Release --no-restore
+        run: dotnet build QuickLog.sln --configuration Release --no-restore
 
-      - name: Pack NuGet
-        run: dotnet pack QuickLog/QuickLog.csproj --configuration Release --no-build --output nupkgs
+      - name: Pack NuGet packages
+        shell: pwsh
+        run: |
+          dotnet pack QuickLog/QuickLog.csproj --configuration Release --no-build --output nupkgs
+          dotnet pack QuickLog.Extensions.Logging/QuickLog.Extensions.Logging.csproj --configuration Release --no-build --output nupkgs
+
+      - name: Validate packages and consumer
+        shell: pwsh
+        run: ./scripts/Test-PackageConsumer.ps1 -PackageDirectory ./nupkgs -WorkingDirectory ./artifacts/package-consumer
 
       - name: Zip binaries
         id: zip
         shell: pwsh
         run: |
           $version = "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}" -replace '^v', ''
-          $outDir  = "QuickLog/bin/Release/net10.0"
           $zipName = "QuickLog-$version-binaries.zip"
-          Compress-Archive -Path "$outDir/QuickLog.dll","$outDir/QuickLog.pdb","$outDir/QuickLog.xml" -DestinationPath $zipName
+          $files = @(
+            'QuickLog/bin/Release/net10.0/QuickLog.dll',
+            'QuickLog/bin/Release/net10.0/QuickLog.pdb',
+            'QuickLog/bin/Release/net10.0/QuickLog.xml',
+            'QuickLog.Extensions.Logging/bin/Release/net10.0/QuickLog.Extensions.Logging.dll',
+            'QuickLog.Extensions.Logging/bin/Release/net10.0/QuickLog.Extensions.Logging.pdb',
+            'QuickLog.Extensions.Logging/bin/Release/net10.0/QuickLog.Extensions.Logging.xml'
+          )
+          Compress-Archive -Path $files -DestinationPath $zipName
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
           echo "VERSION=$version"  >> $env:GITHUB_ENV
+
+      - name: Prepare release notes and checksums
+        shell: pwsh
+        run: |
+          $content = Get-Content CHANGELOG.md -Raw
+          $escapedVersion = [regex]::Escape($env:VERSION)
+          $match = [regex]::Match($content, "(?ms)^## \[$escapedVersion\].*?(?=^## \[|\z)")
+          if (-not $match.Success) { throw "CHANGELOG.md has no $env:VERSION release section." }
+          [System.IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'), $match.Value.Trim())
+          $assets = @($env:ZIP_NAME) + @(Get-ChildItem nupkgs -File | ForEach-Object FullName)
+          $lines = foreach ($asset in $assets) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $asset).Hash.ToLowerInvariant()
+            "$hash  $([System.IO.Path]::GetFileName($asset))"
+          }
+          [System.IO.File]::WriteAllLines((Join-Path $PWD 'SHA256SUMS.txt'), $lines)
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -87,15 +135,19 @@ jobs:
           name: QuickLog v${{ env.VERSION }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          body_path: release-notes.md
           files: |
             ${{ env.ZIP_NAME }}
             nupkgs/*.nupkg
+            nupkgs/*.snupkg
+            SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to NuGet.org
         shell: pwsh
         run: |
-          $pkg = Get-ChildItem nupkgs/*.nupkg | Select-Object -First 1 -ExpandProperty FullName
-          dotnet nuget push $pkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+          $core = Join-Path $PWD "nupkgs/ZLS.QuickLog.$env:VERSION.nupkg"
+          $adapter = Join-Path $PWD "nupkgs/ZLS.QuickLog.Extensions.Logging.$env:VERSION.nupkg"
+          dotnet nuget push $core --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet nuget push $adapter --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

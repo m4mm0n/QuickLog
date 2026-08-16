@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
 
 namespace QuickLog;
 
@@ -57,6 +58,10 @@ public sealed class QLogScope : IDisposable
     /// <param name="callerLineNumber">Compiler-provided caller line number.</param>
     /// <returns>An active QLOG scope, or a no-op scope when no marker is found.</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2026",
+        Justification = "Stack-frame marker discovery is opportunistic and safely becomes a no-op when metadata is unavailable.")]
     public static QLogScope Enter(
         IQuickLog logger,
         [CallerMemberName] string callerName = "",

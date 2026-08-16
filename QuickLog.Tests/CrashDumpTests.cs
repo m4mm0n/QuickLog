@@ -1,25 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : CrashDumpTests.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11 22:17:40 +02:00
- *  Last Modified  : 2026-05-17 20:35:51 +02:00
- *  CRC32          : F9AA6351
- *  
- *  Description    :
- *
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: F9AA6351
-
 using System.Text.Json;
 using QuickLog.Core;
 using QuickLog.Exceptions;
@@ -198,6 +176,39 @@ public sealed class CrashDumpTests : IDisposable
         Assert.Contains("token=***", json);
         Assert.DoesNotContain("hunter2", json);
         Assert.DoesNotContain("abc123", json);
+    }
+
+    [Fact]
+    public void Write_PreservesStructuredRecentLogMetadataAndRedactsProperties()
+    {
+        var recent = new[]
+        {
+            new LogEventArgs(
+                LogType.Error,
+                "failed",
+                null,
+                "Member",
+                "file.cs",
+                12,
+                eventId: new LogEventId(99, "Failure"),
+                properties: LogProperties.Create(
+                    new LogProperty("token", "secret"),
+                    new LogProperty("attempt", 4)))
+        };
+
+        var path = CrashDumpWriter.Write(
+            new InvalidOperationException("boom"),
+            ExceptionSource.AppDomain,
+            isTerminating: true,
+            Opts(),
+            recent);
+
+        using var document = JsonDocument.Parse(File.ReadAllText(path!));
+        var entry = document.RootElement.GetProperty("RecentLogs")[0];
+        Assert.Equal(99, entry.GetProperty("EventId").GetInt32());
+        Assert.Equal("Failure", entry.GetProperty("EventName").GetString());
+        Assert.Equal("***", entry.GetProperty("Properties").GetProperty("token").GetString());
+        Assert.Equal(4, entry.GetProperty("Properties").GetProperty("attempt").GetInt32());
     }
 
     [Fact]

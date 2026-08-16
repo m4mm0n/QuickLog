@@ -14,13 +14,13 @@ public sealed class ExceptionHookTests : IDisposable
         bool markObserved = true,
         Func<Exception, bool>? recovery = null,
         Func<Exception, ExceptionSource, bool>? filter = null) => new()
-    {
-        ShowPopup = false,
-        MarkTaskExceptionsObserved = markObserved,
-        CrashDump = new CrashDumpOptions { Enabled = false },
-        Restart = recovery != null ? new RestartOptions { RecoveryAction = recovery } : null,
-        ExceptionFilter = filter
-    };
+        {
+            ShowPopup = false,
+            MarkTaskExceptionsObserved = markObserved,
+            CrashDump = new CrashDumpOptions { Enabled = false },
+            Restart = recovery != null ? new RestartOptions { RecoveryAction = recovery } : null,
+            ExceptionFilter = filter
+        };
 
     public void Dispose()
     {

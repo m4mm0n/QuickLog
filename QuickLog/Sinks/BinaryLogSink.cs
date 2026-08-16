@@ -1,27 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : BinaryLogSink.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 06:22:01 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : DFDD07C1
- *  
- *  Description    :
- *                   Provides a log sink that writes log entries in a compact binary format to a file for efficient storage and later
- *                   analysis.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: DFDD07C1
-
-using System.Text;
+﻿using System.Text;
 using QuickLog.Core;
 using QuickLog.Utilities;
 
@@ -41,9 +18,6 @@ internal sealed class BinaryLogSink : ILogSink
     private readonly RotatingFileWriter _writer;
     private readonly Crc32 _crc = new();
 
-    private static readonly byte[] Magic = "QLOG"u8.ToArray();
-    private const int Version = 2;
-
     public BinaryLogSink(string path, LogRotationOptions? rotation = null)
     {
         _writer = new RotatingFileWriter(path, rotation);
@@ -54,21 +28,31 @@ internal sealed class BinaryLogSink : ILogSink
         using var ms = new MemoryStream(256);
         using var bw = new BinaryWriter(ms, Encoding.UTF8, leaveOpen: true);
 
-        bw.Write(Magic);
-        bw.Write(Version);
+        bw.Write(BinaryLogFormat.Magic);
+        bw.Write(BinaryLogFormat.CurrentVersion);
         bw.Write(entry.Timestamp.Ticks);
         bw.Write((int)entry.Level);
         bw.Write(entry.ThreadId);
         bw.Write((byte)entry.ThreadRole);
         bw.Write(entry.LineNumber);
 
-        WriteString(bw, entry.MemberName);
-        WriteString(bw, entry.FilePath);
-        WriteString(bw, entry.Category);
-        WriteString(bw, entry.Message);
-        WriteString(bw, entry.CorrelationId);
-        WriteString(bw, entry.TraceId);
-        WriteString(bw, entry.SpanId);
+        BinaryLogFormat.WriteString(bw, entry.MemberName);
+        BinaryLogFormat.WriteString(bw, entry.FilePath);
+        BinaryLogFormat.WriteString(bw, entry.Category);
+        BinaryLogFormat.WriteString(bw, entry.Message);
+        BinaryLogFormat.WriteString(bw, entry.CorrelationId);
+        BinaryLogFormat.WriteString(bw, entry.TraceId);
+        BinaryLogFormat.WriteString(bw, entry.SpanId);
+        bw.Write(entry.EventId.Id);
+        BinaryLogFormat.WriteString(bw, entry.EventId.Name);
+
+        var properties = entry.Properties ?? LogProperties.Empty;
+        bw.Write(properties.Count);
+        foreach (var pair in properties.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            BinaryLogFormat.WriteString(bw, pair.Key);
+            BinaryLogValueCodec.Write(bw, pair.Value);
+        }
 
         bw.Flush();
 
@@ -79,19 +63,6 @@ internal sealed class BinaryLogSink : ILogSink
         Buffer.BlockCopy(BitConverter.GetBytes(crc), 0, record, data.Length, sizeof(uint));
 
         _writer.WriteBytes(record);
-    }
-
-    private static void WriteString(BinaryWriter bw, string? value)
-    {
-        if (string.IsNullOrEmpty(value))
-        {
-            bw.Write(0);
-            return;
-        }
-
-        var bytes = Encoding.UTF8.GetBytes(value);
-        bw.Write(bytes.Length);
-        bw.Write(bytes);
     }
 
     public void Flush() => _writer.Flush();

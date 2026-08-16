@@ -1,13 +1,3 @@
-/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : DefaultExceptionPopup.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-05-11
- *  License        : MIT — https://opensource.org/licenses/MIT
- * ====================================================================================================
- */
-
 using System.Runtime.InteropServices;
 using QuickLog.Platform;
 
@@ -22,12 +12,12 @@ namespace QuickLog.Exceptions;
 public sealed class DefaultExceptionPopup : IExceptionPopup
 {
     // MessageBox type flags (winuser.h)
-    private const uint MB_OK            = 0x00000000u;
-    private const uint MB_ICONERROR     = 0x00000010u;
-    private const uint MB_ICONWARNING   = 0x00000030u;
-    private const uint MB_SYSTEMMODAL  = 0x00001000u;
+    private const uint MB_OK = 0x00000000u;
+    private const uint MB_ICONERROR = 0x00000010u;
+    private const uint MB_ICONWARNING = 0x00000030u;
+    private const uint MB_SYSTEMMODAL = 0x00001000u;
     private const uint MB_SETFOREGROUND = 0x00010000u;
-    private const uint MB_TOPMOST       = 0x00040000u;
+    private const uint MB_TOPMOST = 0x00040000u;
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "MessageBoxW", SetLastError = false)]
     private static extern int NativeMessageBox(IntPtr hWnd, string text, string caption, uint type);

@@ -21,7 +21,7 @@ public static class GrepCommand
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (ToolLogUtilities.IsBinaryLog(file))
-                matches += GrepBinary(file, command.Pattern, console);
+                matches += GrepBinary(file, command.Pattern, command.Property, console);
             else
                 matches += GrepText(file, command.Pattern, console);
         }
@@ -30,16 +30,19 @@ public static class GrepCommand
     }
 
     /// <summary>Searches binary QLOG entries and writes matching messages.</summary>
-    private static int GrepBinary(string path, string pattern, IToolConsole console)
+    private static int GrepBinary(string path, string pattern, string? property, IToolConsole console)
     {
         var matches = 0;
         foreach (var entry in ToolLogUtilities.ReadEntries(path))
         {
-            if (!entry.Message.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+            var textMatch = entry.Message.Contains(pattern, StringComparison.OrdinalIgnoreCase)
+                            || entry.EventId.ToString().Contains(pattern, StringComparison.OrdinalIgnoreCase)
+                            || LogProperties.Format(entry.Properties).Contains(pattern, StringComparison.OrdinalIgnoreCase);
+            if (!textMatch || (!string.IsNullOrWhiteSpace(property) && !ToolLogUtilities.MatchesProperty(entry, property)))
                 continue;
 
             matches++;
-            console.WriteLine($"{Path.GetFileName(path)}:{entry.Timestamp:O} [{entry.Level}] {entry.Message}");
+            console.WriteLine($"{Path.GetFileName(path)}:{entry.Timestamp:O} [{entry.Level}] [{entry.EventId}] {entry.Message} {LogProperties.Format(entry.Properties)}".TrimEnd());
         }
 
         return matches;

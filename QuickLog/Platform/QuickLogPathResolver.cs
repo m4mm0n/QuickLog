@@ -13,14 +13,14 @@ public static class QuickLogPathResolver
     /// <param name="applicationName">Application folder name to use below the platform state directory.</param>
     public static string GetDefaultLogDirectory(string applicationName = "QuickLog")
     {
-        if (QuickLogPlatform.CurrentKind == QuickLogPlatformKind.Linux)
-            return GetLinuxLogDirectory(applicationName);
-
-        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (string.IsNullOrWhiteSpace(local))
-            local = Path.GetTempPath();
-
-        return Path.Combine(local, SafeLogPath.SafeFileName(applicationName), "logs");
+        return QuickLogPlatform.CurrentKind switch
+        {
+            QuickLogPlatformKind.Linux => GetLinuxLogDirectory(applicationName),
+            QuickLogPlatformKind.MacOS => GetMacOSLogDirectory(applicationName),
+            QuickLogPlatformKind.Android => GetAndroidLogDirectory(applicationName),
+            QuickLogPlatformKind.IOS => GetIOSLogDirectory(applicationName),
+            _ => GetApplicationDataLogDirectory(applicationName)
+        };
     }
 
     /// <summary>
@@ -50,6 +50,45 @@ public static class QuickLogPathResolver
     }
 
     /// <summary>
+    /// Returns a macOS log directory below the current user's <c>Library/Logs</c> directory.
+    /// In a sandboxed application, the user home directory is the application's container home.
+    /// </summary>
+    /// <param name="applicationName">Application folder name to use below <c>Library/Logs</c>.</param>
+    /// <param name="homeDirectory">Optional home directory override, mainly useful for tests and controlled hosts.</param>
+    public static string GetMacOSLogDirectory(
+        string applicationName = "QuickLog",
+        string? homeDirectory = null)
+    {
+        var home = FirstNonWhiteSpace(
+            homeDirectory,
+            Environment.GetEnvironmentVariable("HOME"),
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            Path.GetTempPath());
+
+        return Path.Combine(home, "Library", "Logs", SafeLogPath.SafeFileName(applicationName));
+    }
+
+    /// <summary>
+    /// Returns an Android log directory below the application's local-data directory.
+    /// </summary>
+    /// <param name="applicationName">Application folder name to use below the local-data directory.</param>
+    /// <param name="localApplicationData">Optional local-data directory override, mainly useful for tests and controlled hosts.</param>
+    public static string GetAndroidLogDirectory(
+        string applicationName = "QuickLog",
+        string? localApplicationData = null)
+        => GetApplicationDataLogDirectory(applicationName, localApplicationData);
+
+    /// <summary>
+    /// Returns an iOS log directory below the application's local-data directory.
+    /// </summary>
+    /// <param name="applicationName">Application folder name to use below the local-data directory.</param>
+    /// <param name="localApplicationData">Optional local-data directory override, mainly useful for tests and controlled hosts.</param>
+    public static string GetIOSLogDirectory(
+        string applicationName = "QuickLog",
+        string? localApplicationData = null)
+        => GetApplicationDataLogDirectory(applicationName, localApplicationData);
+
+    /// <summary>
     /// Resolves a file path below the current platform's default log directory when the path is relative.
     /// </summary>
     /// <param name="path">Absolute or relative file path to resolve.</param>
@@ -60,6 +99,18 @@ public static class QuickLogPathResolver
             return path;
 
         return Path.Combine(GetDefaultLogDirectory(applicationName), path);
+    }
+
+    private static string GetApplicationDataLogDirectory(
+        string applicationName,
+        string? localApplicationData = null)
+    {
+        var root = FirstNonWhiteSpace(
+            localApplicationData,
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Path.GetTempPath());
+
+        return Path.Combine(root, SafeLogPath.SafeFileName(applicationName), "logs");
     }
 
     private static string FirstNonWhiteSpace(params string?[] values)

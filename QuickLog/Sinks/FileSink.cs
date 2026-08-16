@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : FileSink.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 05:50:45 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : BCE4A392
- *  
- *  Description    :
- *                   Provides a log sink that writes log entries to a file in batches for improved performance.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: BCE4A392
-
-using QuickLog.Core;
+﻿using QuickLog.Core;
 using System.Collections.Concurrent;
 
 namespace QuickLog.Sinks;
@@ -58,9 +36,13 @@ internal sealed class FileSink : ILogSink
             var context = string.IsNullOrWhiteSpace(e.CorrelationId)
                 ? string.Empty
                 : $" [{e.CorrelationId}]";
+            var eventText = e.EventId == LogEventId.None ? string.Empty : $" [{e.EventId}]";
+            var properties = LogProperties.Format(e.Properties);
+            if (properties.Length > 0)
+                properties = $" {properties}";
 
             _writer.WriteLine(
-                $"[{e.Timestamp:O}] [{e.Level}] [{e.ThreadRole}]{context} {e.Message}");
+                $"[{e.Timestamp:O}] [{e.Level}] [{e.ThreadRole}]{context}{eventText} {e.Message}{properties}");
         }
 
         _writer.Flush();

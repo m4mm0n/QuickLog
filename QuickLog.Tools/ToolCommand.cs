@@ -1,17 +1,29 @@
 namespace QuickLog.Tools;
 
+/// <summary>Represents the result of parsing command-line arguments.</summary>
 public sealed record ToolParseResult(ToolCommand? Command, string? Error)
 {
+    /// <summary>Gets a value indicating whether parsing produced a command without an error.</summary>
     public bool Success => Command is not null && Error is null;
 
+    /// <summary>Creates a successful parse result.</summary>
+    /// <param name="command">The parsed command.</param>
+    /// <returns>A successful parse result.</returns>
     public static ToolParseResult Ok(ToolCommand command) => new(command, null);
+
+    /// <summary>Creates a failed parse result.</summary>
+    /// <param name="error">The validation or syntax error.</param>
+    /// <returns>A failed parse result.</returns>
     public static ToolParseResult Fail(string error) => new(null, error);
 }
 
+/// <summary>Provides the common base type for parsed QuickLog tool commands.</summary>
 public abstract record ToolCommand;
 
+/// <summary>Represents a command that diagnoses log files in a directory tree.</summary>
 public sealed record DoctorToolCommand(string Path, bool Recursive) : ToolCommand;
 
+/// <summary>Represents a command that inspects and filters entries in a QLOG file.</summary>
 public sealed record InspectToolCommand(
     string Path,
     string? Level,
@@ -19,12 +31,17 @@ public sealed record InspectToolCommand(
     string? Correlation,
     DateTime? From,
     DateTime? To,
-    int? Limit) : ToolCommand;
+    int? Limit,
+    string? Event = null,
+    string? Property = null) : ToolCommand;
 
+/// <summary>Represents a command that replays QLOG entries to another output format.</summary>
 public sealed record ReplayToolCommand(string Path, string To, string? Out) : ToolCommand;
 
+/// <summary>Represents a command that measures logging throughput for a selected mode.</summary>
 public sealed record BenchmarkToolCommand(int Iterations, string Mode) : ToolCommand;
 
+/// <summary>Represents a command that creates a bounded diagnostics support bundle.</summary>
 public sealed record BundleToolCommand(
     string Out,
     string? Logs,
@@ -34,6 +51,7 @@ public sealed record BundleToolCommand(
     long? MaxFileBytes,
     bool Redact) : ToolCommand;
 
+/// <summary>Represents a command that launches an application in a captured diagnostics session.</summary>
 public sealed record LaunchToolCommand(
     string App,
     IReadOnlyList<string> AppArgs,
@@ -42,17 +60,20 @@ public sealed record LaunchToolCommand(
     bool DiagnosticEnv,
     bool WaitForExit) : ToolCommand;
 
+/// <summary>Represents a command that observes a running process for a fixed duration.</summary>
 public sealed record ObserveToolCommand(int Pid, int DurationSeconds, string Out) : ToolCommand;
 
+/// <summary>Represents a command that explains the optional native profiler contract.</summary>
 public sealed record ProfilerExplainToolCommand : ToolCommand;
 
+/// <summary>Represents a command that prints environment variables for a native profiler.</summary>
 public sealed record ProfilerEnvToolCommand(Guid Clsid, string Path) : ToolCommand;
 
 /// <summary>Represents a tail command for printing the end of a text log.</summary>
 public sealed record TailToolCommand(string Path, int Lines, bool Follow) : ToolCommand;
 
 /// <summary>Represents a grep command for finding messages across log files.</summary>
-public sealed record GrepToolCommand(string Pattern, string Path, bool Recursive) : ToolCommand;
+public sealed record GrepToolCommand(string Pattern, string Path, bool Recursive, string? Property = null) : ToolCommand;
 
 /// <summary>Represents a diff command for comparing two log files.</summary>
 public sealed record DiffToolCommand(string Left, string Right) : ToolCommand;
@@ -81,9 +102,12 @@ public sealed record TimelineToolCommand(string Path) : ToolCommand;
 /// <summary>Represents a configuration doctor command for validating serialized logger options.</summary>
 public sealed record DoctorConfigToolCommand(string Path) : ToolCommand;
 
+/// <summary>Parses QuickLog tool command-line arguments into typed commands.</summary>
 public static class ToolCommandParser
 {
     /// <summary>Parses command-line arguments into a typed tool command.</summary>
+    /// <param name="args">The command-line arguments to parse.</param>
+    /// <returns>The parsed command or a validation error.</returns>
     public static ToolParseResult Parse(IReadOnlyList<string> args)
     {
         if (args.Count == 0)
@@ -128,7 +152,7 @@ public static class ToolCommandParser
 
     private static ToolParseResult ParseInspect(IReadOnlyList<string> args)
     {
-        if (RejectUnknownOptions(args, 1, "--level", "--contains", "--correlation", "--from", "--to", "--limit") is { } unknown)
+        if (RejectUnknownOptions(args, 1, "--level", "--contains", "--correlation", "--from", "--to", "--limit", "--event", "--property") is { } unknown)
             return unknown;
 
         var path = FirstPositional(args, 1);
@@ -151,7 +175,9 @@ public static class ToolCommandParser
             Value(args, "--correlation"),
             from,
             to,
-            limit));
+            limit,
+            Value(args, "--event"),
+            Value(args, "--property")));
     }
 
     private static ToolParseResult ParseReplay(IReadOnlyList<string> args)
@@ -293,14 +319,15 @@ public static class ToolCommandParser
     /// <summary>Parses grep command arguments.</summary>
     private static ToolParseResult ParseGrep(IReadOnlyList<string> args)
     {
-        if (RejectUnknownOptions(args, 1, "--recursive") is { } unknown)
+        if (RejectUnknownOptions(args, 1, "--recursive", "--property") is { } unknown)
             return unknown;
 
         var positionals = Positionals(args, 1);
         if (positionals.Count < 2)
             return ToolParseResult.Fail("grep requires a pattern and path.");
 
-        return ToolParseResult.Ok(new GrepToolCommand(positionals[0], positionals[1], Has(args, "--recursive")));
+        return ToolParseResult.Ok(new GrepToolCommand(
+            positionals[0], positionals[1], Has(args, "--recursive"), Value(args, "--property")));
     }
 
     /// <summary>Parses diff command arguments.</summary>

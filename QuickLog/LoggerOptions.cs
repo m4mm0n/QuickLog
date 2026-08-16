@@ -70,7 +70,7 @@ public sealed class LoggerOptions
     /// <summary>Thread role that is never dropped (used with <see cref="AsyncDropPolicy.DropByThreadRole"/>).</summary>
     public ThreadRole AsyncProtectedRole { get; set; } = ThreadRole.Audio;
 
-    /// <summary>Optional size-based rotation settings for file-backed sinks.</summary>
+    /// <summary>Optional rotation, retention, and compression settings for file-backed sinks.</summary>
     public LogRotationOptions? Rotation { get; set; }
 
     /// <summary>Maximum number of entries buffered by the async dispatcher.</summary>
@@ -171,14 +171,30 @@ public sealed class LoggerOptions
         return this;
     }
 
-    /// <summary>Enable size-based rotation for file-backed sinks.</summary>
-    public LoggerOptions WithRotation(long maxFileBytes, int maxFiles = 5, bool rotateOnStartup = false)
+    /// <summary>Enables rotation and retention for file-backed sinks.</summary>
+    /// <param name="maxFileBytes">Maximum active-file size before rotation.</param>
+    /// <param name="maxFiles">Maximum files to retain, including the active file.</param>
+    /// <param name="rotateOnStartup">Whether to rotate a non-empty active file at startup.</param>
+    /// <param name="maxAge">Optional maximum age for rotated files.</param>
+    /// <param name="maxTotalBytes">Optional total byte budget across the active file and rotations.</param>
+    /// <param name="compressRotatedFiles">Whether to GZip newly rotated files.</param>
+    /// <returns>The current options instance.</returns>
+    public LoggerOptions WithRotation(
+        long maxFileBytes,
+        int maxFiles = 5,
+        bool rotateOnStartup = false,
+        TimeSpan? maxAge = null,
+        long maxTotalBytes = 0,
+        bool compressRotatedFiles = false)
     {
         Rotation = new LogRotationOptions
         {
             MaxFileBytes = maxFileBytes,
             MaxFiles = maxFiles,
-            RotateOnStartup = rotateOnStartup
+            RotateOnStartup = rotateOnStartup,
+            MaxAge = maxAge,
+            MaxTotalBytes = maxTotalBytes,
+            CompressRotatedFiles = compressRotatedFiles
         };
         return this;
     }
@@ -271,9 +287,61 @@ public sealed class LoggerOptions
             ? QuickLogPathResolver.GetLinuxLogDirectory(applicationName, stateHome, homeDirectory)
             : logDirectory;
 
-        return ForEngine(root)
-            .WithConsole(false)
-            .WithSession("linux", autoId: true);
+        return ForPlatformApplication(root, "linux");
+    }
+
+    /// <summary>
+    /// Creates a macOS-ready profile that stores durable logs below <c>~/Library/Logs</c> by default.
+    /// </summary>
+    /// <param name="applicationName">Application folder name used below the macOS log directory.</param>
+    /// <param name="logDirectory">Optional explicit log directory. When supplied, home-directory resolution is bypassed.</param>
+    /// <param name="homeDirectory">Optional home directory override, mainly useful for tests and controlled hosts.</param>
+    public static LoggerOptions ForMacOS(
+        string applicationName = "QuickLog",
+        string? logDirectory = null,
+        string? homeDirectory = null)
+    {
+        var root = string.IsNullOrWhiteSpace(logDirectory)
+            ? QuickLogPathResolver.GetMacOSLogDirectory(applicationName, homeDirectory)
+            : logDirectory;
+
+        return ForPlatformApplication(root, "macos");
+    }
+
+    /// <summary>
+    /// Creates an Android-ready profile that stores durable logs below the application's local-data directory by default.
+    /// </summary>
+    /// <param name="applicationName">Application folder name used below the local-data directory.</param>
+    /// <param name="logDirectory">Optional explicit log directory. When supplied, local-data resolution is bypassed.</param>
+    /// <param name="localApplicationData">Optional local-data directory override, mainly useful for tests and controlled hosts.</param>
+    public static LoggerOptions ForAndroid(
+        string applicationName = "QuickLog",
+        string? logDirectory = null,
+        string? localApplicationData = null)
+    {
+        var root = string.IsNullOrWhiteSpace(logDirectory)
+            ? QuickLogPathResolver.GetAndroidLogDirectory(applicationName, localApplicationData)
+            : logDirectory;
+
+        return ForPlatformApplication(root, "android");
+    }
+
+    /// <summary>
+    /// Creates an iOS-ready profile that stores durable logs below the application's local-data directory by default.
+    /// </summary>
+    /// <param name="applicationName">Application folder name used below the local-data directory.</param>
+    /// <param name="logDirectory">Optional explicit log directory. When supplied, local-data resolution is bypassed.</param>
+    /// <param name="localApplicationData">Optional local-data directory override, mainly useful for tests and controlled hosts.</param>
+    public static LoggerOptions ForIOS(
+        string applicationName = "QuickLog",
+        string? logDirectory = null,
+        string? localApplicationData = null)
+    {
+        var root = string.IsNullOrWhiteSpace(logDirectory)
+            ? QuickLogPathResolver.GetIOSLogDirectory(applicationName, localApplicationData)
+            : logDirectory;
+
+        return ForPlatformApplication(root, "ios");
     }
 
     /// <summary>
@@ -313,6 +381,48 @@ public sealed class LoggerOptions
         return this;
     }
 
+    /// <summary>Creates an independent logger configured from the current option values.</summary>
+    /// <returns>A new logger instance owned by the caller.</returns>
+    public QuickLogger CreateLogger()
+    {
+        var logger = new QuickLogger(LogFilePath)
+        {
+            EnableConsoleLogging = ConsoleLogging,
+            EnableFileLogging = FileLogging && LogFilePath != null,
+            EnableEventLogging = EventLogging,
+            EnableTraceLogging = TraceLogging,
+            EnableAsyncLogging = AsyncLogging,
+            AsyncOnly = AsyncOnly,
+            AsyncDropPolicy = AsyncDropPolicy,
+            AsyncMinimumLevel = AsyncMinimumLevel,
+            AsyncProtectedRole = AsyncProtectedRole,
+            JsonLogPath = JsonLogPath,
+            EnableAsyncBinaryLogging = AsyncBinaryLogging,
+            BinaryLogPath = BinaryLogPath,
+            EnableAsyncTraceLogging = AsyncTraceLogging,
+            Rotation = Rotation,
+            AsyncQueueCapacity = AsyncQueueCapacity,
+            Redaction = Redaction,
+            SpamControl = SpamControl,
+            Filter = Filter,
+            SessionName = SessionName,
+            SessionId = AutoSessionId ? Guid.NewGuid().ToString("N") : SessionName ?? "quicklog",
+            EmitStartupBanner = EmitStartupBanner,
+            EmitShutdownSummary = EmitShutdownSummary,
+            UseAnsiColor = UseAnsiColor,
+            CompactText = CompactText,
+            UseLocalTime = UseLocalTime,
+            MinimumLevel = MinimumLevel
+        };
+
+        foreach (var pair in SinkMinimumLevels)
+            logger.SinkMinimumLevels[pair.Key] = pair.Value;
+
+        if (logger.EmitStartupBanner)
+            logger.EmitStartup();
+        return logger;
+    }
+
     /// <summary>
     /// Validates the option set for contradictory or lossy settings.
     /// </summary>
@@ -329,6 +439,12 @@ public sealed class LoggerOptions
         if (Rotation is not null && (Rotation.MaxFileBytes <= 0 || Rotation.MaxFiles <= 0))
             issues.Add(new("QL002", "Rotation requires MaxFileBytes and MaxFiles greater than zero.", LoggerOptionsIssueSeverity.Error));
 
+        if (Rotation?.MaxAge < TimeSpan.Zero)
+            issues.Add(new("QL003", "Rotation MaxAge cannot be negative.", LoggerOptionsIssueSeverity.Error));
+
+        if (Rotation?.MaxTotalBytes < 0)
+            issues.Add(new("QL004", "Rotation MaxTotalBytes cannot be negative.", LoggerOptionsIssueSeverity.Error));
+
         return new LoggerOptionsValidationResult(issues);
     }
 
@@ -336,4 +452,9 @@ public sealed class LoggerOptions
         => directory.Contains("://", StringComparison.Ordinal)
             ? $"{directory.TrimEnd('/', '\\')}/{fileName}"
             : Path.Combine(directory, fileName);
+
+    private static LoggerOptions ForPlatformApplication(string logDirectory, string sessionName)
+        => ForEngine(logDirectory)
+            .WithConsole(false)
+            .WithSession(sessionName, autoId: true);
 }

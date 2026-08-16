@@ -1,27 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : LogEntry.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 05:41:29 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 960990EF
- *  
- *  Description    :
- *                   Represents a single log entry containing details about a logging event, including timestamp, severity level,
- *                   message, and contextual information.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 960990EF
-
-namespace QuickLog.Core;
+﻿namespace QuickLog.Core;
 
 /// <summary>
 /// Represents a single log entry containing details about a logging event, including timestamp, severity level,
@@ -42,6 +19,8 @@ namespace QuickLog.Core;
 /// <param name="CorrelationId">The optional correlation identifier active when the log entry was created.</param>
 /// <param name="TraceId">The optional trace identifier active when the log entry was created.</param>
 /// <param name="SpanId">The optional span identifier active when the log entry was created.</param>
+/// <param name="EventId">The stable event identifier, or <see cref="LogEventId.None"/>.</param>
+/// <param name="Properties">The immutable structured properties attached to the entry.</param>
 public readonly record struct LogEntry
 (
     DateTime Timestamp,
@@ -56,5 +35,7 @@ public readonly record struct LogEntry
     ThreadRole ThreadRole,
     string? CorrelationId = null,
     string? TraceId = null,
-    string? SpanId = null
+    string? SpanId = null,
+    LogEventId EventId = default,
+    IReadOnlyDictionary<string, object?>? Properties = null
 );

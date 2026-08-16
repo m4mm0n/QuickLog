@@ -4,8 +4,14 @@ using System.Text.Json;
 
 namespace QuickLog.Tools.Commands;
 
+/// <summary>Validates supported QuickLog files and reports corruption or parse failures.</summary>
 public static class DoctorCommand
 {
+    /// <summary>Diagnoses a file or directory of log artifacts.</summary>
+    /// <param name="command">The diagnostic path and traversal options.</param>
+    /// <param name="console">The destination for diagnostic findings.</param>
+    /// <param name="cancellationToken">A token that cancels inspection.</param>
+    /// <returns>A task containing the command result.</returns>
     public static Task<CommandResult> ExecuteAsync(
         DoctorToolCommand command,
         IToolConsole console,

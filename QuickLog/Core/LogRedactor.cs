@@ -49,6 +49,28 @@ public sealed class LogRedactor
         return _options.RedactUserProfilePaths ? RedactUserPaths(result) : result;
     }
 
+    /// <summary>Returns an immutable property snapshot with sensitive names and text values masked.</summary>
+    /// <param name="properties">The properties to redact.</param>
+    /// <returns>A redacted property snapshot.</returns>
+    public IReadOnlyDictionary<string, object?> RedactProperties(
+        IReadOnlyDictionary<string, object?>? properties)
+    {
+        if (properties is null || properties.Count == 0)
+            return LogProperties.Empty;
+
+        var values = new Dictionary<string, object?>(properties.Count, StringComparer.Ordinal);
+        foreach (var pair in properties)
+        {
+            var isSensitive = _options.SensitiveKeys.Any(key =>
+                string.Equals(key, pair.Key, StringComparison.OrdinalIgnoreCase));
+            values[pair.Key] = isSensitive
+                ? _options.Mask
+                : pair.Value is string text ? Redact(text) : pair.Value;
+        }
+
+        return LogProperties.Snapshot(values);
+    }
+
     private string RedactUserPaths(string value)
     {
         var mask = _options.Mask;

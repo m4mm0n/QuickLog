@@ -55,7 +55,7 @@ internal static class StaticHtmlReportWriter
             return;
         }
 
-        html.AppendLine("<table><thead><tr><th>File</th><th>Entries</th><th>Levels</th><th>Top Messages</th></tr></thead><tbody>");
+        html.AppendLine("<table><thead><tr><th>File</th><th>Entries</th><th>Levels</th><th>Events and Properties</th><th>Top Messages</th></tr></thead><tbody>");
         foreach (var item in model.QlogSummaries)
         {
             html.Append("<tr>");
@@ -64,6 +64,11 @@ internal static class StaticHtmlReportWriter
             html.Append("<td>");
             foreach (var pair in item.Summary.LevelCounts)
                 html.Append($"<span class=\"pill\">{Encode(pair.Key.ToString())}: {pair.Value}</span>");
+            html.Append("</td><td>");
+            foreach (var pair in item.Summary.EventCounts.OrderByDescending(pair => pair.Value).Take(5))
+                html.Append($"<div>Event {pair.Value} x {Encode(pair.Key)}</div>");
+            foreach (var pair in item.Summary.PropertyCounts.OrderByDescending(pair => pair.Value).Take(5))
+                html.Append($"<div>Property {pair.Value} x {Encode(pair.Key)}</div>");
             html.Append("</td><td>");
             foreach (var message in item.Summary.TopMessages.Take(5))
                 html.Append($"<div>{message.Count} x {Encode(message.Message)}</div>");

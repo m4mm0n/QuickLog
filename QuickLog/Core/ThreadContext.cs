@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : ThreadContext.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2026-01-18 06:39:14 +01:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : BA0E2081
- *  
- *  Description    :
- *                   Provides per-thread role tagging for logging.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: BA0E2081
-
-namespace QuickLog.Core;
+﻿namespace QuickLog.Core;
 
 /// <summary>
 /// Provides per-thread role tagging for logging.

@@ -1,26 +1,4 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : FileLogger.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2024-10-09 20:49:25 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 4E2E3EEE
- *  
- *  Description    :
- *                   A logger that writes log entries to a file, ensuring thread safety for multiple logging instances.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 4E2E3EEE
-
-using QuickLog.Utilities;
+﻿using QuickLog.Utilities;
 using System.Runtime.CompilerServices;
 
 namespace QuickLog.Loggers;

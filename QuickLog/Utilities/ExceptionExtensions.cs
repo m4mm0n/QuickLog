@@ -1,30 +1,8 @@
-﻿/*
- * ====================================================================================================
- *  Project        : QuickLog
- *  File           : ExceptionExtensions.cs
- *  Author         : Geir Gustavsen, ZeroLinez Softworx 2024 - 2026
- *  Created        : 2025-09-18 03:10:10 +02:00
- *  Last Modified  : 2026-01-18 07:12:52 +01:00
- *  CRC32          : 158F52FF
- *  
- *  Description    :
- *                   Extension methods that produce readable exception text similar to Ben.Demystifier's ToStringDemystified,
- *                   but implemented internally with zero external dependencies.
- * 
- *  License        :
- *                   MIT
- *                   https://opensource.org/licenses/MIT
- *
- *  Notes          :
- *                   THIS PROJECT IS A COMPLETE, AND SIMPLE TO USE LOGGER
- * ====================================================================================================
- */
-// CRC32-BODY: 158F52FF
-
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Diagnostics.CodeAnalysis;
 
 namespace QuickLog.Utilities;
 
@@ -131,6 +109,10 @@ public static class ExceptionExtensions
             return false;
         }
 
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2026",
+            Justification = "Exception formatting tolerates incomplete stack metadata and falls back to the available frame text.")]
         public static DemystifiedFrame? Create(StackFrame frame)
         {
             var method = frame.GetMethod();
@@ -177,6 +159,10 @@ public static class ExceptionExtensions
         /// <summary>
         /// If the frame points to a state machine's MoveNext, remap it back to the original async/iterator method.
         /// </summary>
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2075",
+            Justification = "State-machine remapping is best-effort and returns the original method when metadata is unavailable.")]
         private static MethodBase? RemapStateMachineMethod(MethodBase method)
         {
             if (method.Name != "MoveNext" || method.DeclaringType == null) return null;
